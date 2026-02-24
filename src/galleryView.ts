@@ -60,7 +60,7 @@ export class PinterestGalleryView extends ItemView {
 			"pinterest-gallery-header-controls",
 		);
 		const settingsButton = controlsEl.createEl("button", {
-			text: "Открыть настройки",
+			text: "Настройки",
 		});
 		settingsButton.addClass("pinterest-gallery-button");
 		settingsButton.onclick = () => {
@@ -91,9 +91,6 @@ export class PinterestGalleryView extends ItemView {
 		for (const note of notes) {
 			const cardEl = this.gridEl.createDiv("pinterest-gallery-card");
 
-			const titleEl = cardEl.createDiv("pinterest-gallery-card-title");
-			titleEl.setText(note.title);
-
 			// Картинка из первой вложенной картинки заметки (если есть)
 			const imageFile = this.findFirstImageForFile(note.file);
 			if (imageFile) {
@@ -106,6 +103,11 @@ export class PinterestGalleryView extends ItemView {
 				imgEl.loading = "lazy";
 			}
 
+			// Заголовок карточки
+			const titleEl = cardEl.createDiv("pinterest-gallery-card-title");
+			titleEl.setText(note.title);
+
+			// Описание карточки
 			const snippetEl = cardEl.createDiv(
 				"pinterest-gallery-card-snippet",
 			);
@@ -197,6 +199,10 @@ export class PinterestGalleryView extends ItemView {
 			snippet = "Пустая заметка";
 		} else if (snippet.length > 280) {
 			snippet = snippet.slice(0, 277) + "...";
+		}
+
+		if (title.length > 80) {
+			title = title.slice(0, 77) + "..."
 		}
 
 		return { title, snippet };
