@@ -26,5 +26,5 @@
 	},
 	"include": [
 		"src/**/*.ts"
-	]
+, "src/main.js"	]
 }
