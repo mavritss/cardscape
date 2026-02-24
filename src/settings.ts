@@ -1,15 +1,15 @@
-import {App, PluginSettingTab, Setting} from "obsidian";
-import MyPlugin from "./main";
+import { App, PluginSettingTab, Setting } from "obsidian";
+import type MyPlugin from "./main";
 
-export interface MyPluginSettings {
-	mySetting: string;
+export interface GalleryPluginSettings {
+	folderPath: string;
 }
 
-export const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
+export const DEFAULT_SETTINGS: GalleryPluginSettings = {
+	folderPath: "",
+};
 
-export class SampleSettingTab extends PluginSettingTab {
+export class GallerySettingTab extends PluginSettingTab {
 	plugin: MyPlugin;
 
 	constructor(app: App, plugin: MyPlugin) {
@@ -18,19 +18,25 @@ export class SampleSettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
-		const {containerEl} = this;
+		const { containerEl } = this;
 
 		containerEl.empty();
 
+		containerEl.createEl("h2", { text: "Pinterest Cards Gallery" });
+
 		new Setting(containerEl)
-			.setName('Settings #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+			.setName("Папка с заметками")
+			.setDesc(
+				'Путь к папке внутри хранилища Obsidian, например "Notes/Projects". Оставьте пустым, чтобы использовать весь vault.',
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Например: Notes/Projects")
+					.setValue(this.plugin.settings.folderPath)
+					.onChange(async (value) => {
+						this.plugin.settings.folderPath = value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
 	}
 }

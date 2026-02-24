@@ -1,8 +1,152 @@
 /*
-
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
-
-If your plugin does not need CSS, delete this file.
-
+Pinterest‑подобная галерея карточек заметок
 */
+
+.pinterest-gallery-view {
+	padding: 1.5rem 2rem;
+	height: 100%;
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+.pinterest-gallery-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem 1rem;
+}
+
+.pinterest-gallery-header h2 {
+	margin: 0;
+	font-size: 1.35rem;
+	font-weight: 600;
+}
+
+.pinterest-gallery-header-info {
+	font-size: 0.9rem;
+	opacity: 0.8;
+}
+
+.pinterest-gallery-header-controls {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.pinterest-gallery-button {
+	padding: 0.35rem 0.8rem;
+	font-size: 0.85rem;
+	border-radius: 999px;
+	border: 1px solid var(--interactive-normal);
+	background-color: var(--background-secondary);
+	color: var(--text-normal);
+	cursor: pointer;
+	transition:
+		background-color 120ms ease,
+		transform 80ms ease,
+		box-shadow 120ms ease,
+		border-color 120ms ease;
+}
+
+.pinterest-gallery-button:hover {
+	background-color: var(--interactive-hover);
+	border-color: var(--interactive-accent);
+	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+	transform: translateY(-1px);
+}
+
+.pinterest-gallery-button:active {
+	transform: translateY(0);
+	box-shadow: none;
+}
+
+.pinterest-gallery-grid {
+	/* Masonry layout через columns */
+	column-count: 4;
+	column-gap: 1rem;
+	width: 100%;
+	flex: 1;
+	overflow: auto;
+	padding-bottom: 1rem;
+}
+
+@media (max-width: 1400px) {
+	.pinterest-gallery-grid {
+		column-count: 3;
+	}
+}
+
+@media (max-width: 1024px) {
+	.pinterest-gallery-grid {
+		column-count: 2;
+	}
+}
+
+@media (max-width: 700px) {
+	.pinterest-gallery-grid {
+		column-count: 1;
+	}
+}
+
+.pinterest-gallery-card {
+	display: inline-block;
+	width: 100%;
+	margin: 0 0 1rem;
+	box-sizing: border-box;
+	background-color: var(--background-secondary);
+	border-radius: 0.9rem;
+	padding: 0.8rem 0.9rem;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+	border: 1px solid transparent;
+	break-inside: avoid;
+	cursor: pointer;
+	transition:
+		transform 140ms ease,
+		box-shadow 140ms ease,
+		border-color 140ms ease,
+		background-color 140ms ease;
+}
+
+.pinterest-gallery-card:hover {
+	transform: translateY(-3px);
+	box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+	border-color: var(--interactive-accent);
+	background-color: var(--background-primary);
+}
+
+.pinterest-gallery-card-title {
+	font-weight: 600;
+	margin-bottom: 0.45rem;
+	font-size: 0.95rem;
+}
+
+.pinterest-gallery-card-image {
+	width: 100%;
+	border-radius: 0.7rem;
+	overflow: hidden;
+	margin-bottom: 0.5rem;
+}
+
+.pinterest-gallery-card-image img {
+	display: block;
+	width: 100%;
+	height: auto;
+	object-fit: cover;
+}
+
+.pinterest-gallery-card-snippet {
+	font-size: 0.85rem;
+	line-height: 1.4;
+	opacity: 0.9;
+	white-space: pre-line;
+}
+
+.pinterest-gallery-empty {
+	font-size: 0.9rem;
+	opacity: 0.8;
+}
+
