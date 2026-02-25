@@ -19,6 +19,17 @@ Pinterest‑подобная галерея карточек заметок
 	gap: 0.75rem 1rem;
 }
 
+.pinterest-gallery-header-left {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.pinterest-gallery-header h2,
+.pinterest-gallery-header-info {
+	display: none;
+}
+
 .pinterest-gallery-header h2 {
 	margin: 0;
 	font-size: 1.35rem;
@@ -35,6 +46,22 @@ Pinterest‑подобная галерея карточек заметок
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
+}
+
+.pinterest-gallery-folder-button {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.pinterest-gallery-folder-button-part {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+.pinterest-gallery-folder-button-separator {
+	opacity: 0.7;
 }
 
 .pinterest-gallery-button {
@@ -173,6 +200,7 @@ Pinterest‑подобная галерея карточек заметок
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	gap: 0.5rem;
 }
 
 .pinterest-gallery-tags-row {

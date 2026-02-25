@@ -3,10 +3,12 @@ import type MyPlugin from "./main";
 
 export interface GalleryPluginSettings {
 	folderPath: string;
+	maxNotes: number;
 }
 
 export const DEFAULT_SETTINGS: GalleryPluginSettings = {
 	folderPath: "",
+	maxNotes: 600,
 };
 
 export class GallerySettingTab extends PluginSettingTab {
@@ -35,6 +37,26 @@ export class GallerySettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.folderPath)
 					.onChange(async (value) => {
 						this.plugin.settings.folderPath = value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Максимум заметок в галерее")
+			.setDesc(
+				"Сколько последних заметок загружать для галереи. Увеличивайте осторожно, большие значения могут замедлить работу (особенно с картинками).",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Например: 600")
+					.setValue(String(this.plugin.settings.maxNotes ?? 600))
+					.onChange(async (value) => {
+						const parsed = Number(value);
+						const safe = Number.isFinite(parsed)
+							? Math.min(Math.max(Math.round(parsed), 50), 3000)
+							: 600;
+						this.plugin.settings.maxNotes = safe;
+						text.setValue(String(safe));
 						await this.plugin.saveSettings();
 					}),
 			);

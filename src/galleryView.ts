@@ -5,6 +5,7 @@ import {
 	TFolder,
 	WorkspaceLeaf,
 	Notice,
+	setIcon,
 } from "obsidian";
 import type MyPlugin from "./main";
 
@@ -25,6 +26,7 @@ export class PinterestGalleryView extends ItemView {
 	tagFilterContainerEl: HTMLElement | null = null;
 	allNotes: GalleryNoteCard[] = [];
 	selectedTags: Set<string> = new Set();
+	folderInfoButton: HTMLButtonElement | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: MyPlugin) {
 		super(leaf);
@@ -50,17 +52,29 @@ export class PinterestGalleryView extends ItemView {
 		containerEl.addClass("pinterest-gallery-view");
 
 		const headerEl = containerEl.createDiv("pinterest-gallery-header");
-		headerEl.createEl("h2", { text: "Pinterest cards gallery" });
 
-		const infoEl = headerEl.createDiv("pinterest-gallery-header-info");
-		const folderPath =
-			this.plugin.settings.folderPath?.trim() ??
-			"";
-		infoEl.setText(
-			folderPath
-				? `Папка: ${folderPath}`
-				: "Папка не выбрана — будут показаны заметки из всего хранилища.",
+		const headerLeftEl = headerEl.createDiv(
+			"pinterest-gallery-header-left",
 		);
+
+		// Кнопка обновления
+		const refreshButton = headerLeftEl.createEl("button", {
+			attr: { "aria-label": "Обновить галерею" },
+		});
+		refreshButton.addClass("pinterest-gallery-button");
+		const refreshIconSpan = refreshButton.createSpan();
+		setIcon(refreshIconSpan, "refresh-ccw");
+		refreshButton.onclick = () => {
+			void this.refreshNotes();
+		};
+
+		// Кнопка с папкой и количеством заметок
+		const folderButton = headerLeftEl.createEl("button");
+		folderButton.addClass("pinterest-gallery-button");
+		this.folderInfoButton = folderButton;
+		folderButton.onclick = () => {
+			this.plugin.openSettings();
+		};
 
 		const controlsEl = headerEl.createDiv(
 			"pinterest-gallery-header-controls",
@@ -72,9 +86,11 @@ export class PinterestGalleryView extends ItemView {
 		tagsButton.addClass("pinterest-gallery-button");
 
 		const settingsButton = controlsEl.createEl("button", {
-			text: "Настройки",
+			attr: { "aria-label": "Настройки галереи" },
 		});
 		settingsButton.addClass("pinterest-gallery-button");
+		const settingsIconSpan = settingsButton.createSpan();
+		setIcon(settingsIconSpan, "settings");
 		settingsButton.onclick = () => {
 			// Открыть вкладку настроек плагина
 			this.plugin.openSettings();
@@ -97,9 +113,7 @@ export class PinterestGalleryView extends ItemView {
 
 		this.gridEl = containerEl.createDiv("pinterest-gallery-grid");
 
-		this.allNotes = await this.loadNotesFromFolder();
-		this.renderTagFilters();
-		await this.renderNotes();
+		await this.refreshNotes();
 	}
 
 	async renderNotes(): Promise<void> {
@@ -198,8 +212,26 @@ export class PinterestGalleryView extends ItemView {
 		const files: TFile[] = [];
 		this.collectMarkdownFiles(root, files);
 
+		// При очень больших хранилищах ограничиваемся наиболее свежими заметками,
+		// чтобы не блокировать интерфейс. Значение задаётся в настройках плагина.
+		const MAX_NOTES = this.plugin.settings.maxNotes ?? 600;
+		const sortedFiles = files
+			.slice()
+			.sort((a, b) => {
+				const aTime =
+					typeof a.stat.ctime === "number"
+						? a.stat.ctime
+						: a.stat.mtime;
+				const bTime =
+					typeof b.stat.ctime === "number"
+						? b.stat.ctime
+						: b.stat.mtime;
+				return bTime - aTime;
+			})
+			.slice(0, MAX_NOTES);
+
 		const cards: GalleryNoteCard[] = [];
-		for (const file of files) {
+		for (const file of sortedFiles) {
 			const content = await vault.cachedRead(file);
 			const { title, snippet } = this.extractTitleAndSnippet(
 				file,
@@ -354,6 +386,54 @@ export class PinterestGalleryView extends ItemView {
 		return 6;
 	}
 
+	private async refreshNotes(): Promise<void> {
+		this.allNotes = await this.loadNotesFromFolder();
+		this.renderTagFilters();
+		this.updateFolderInfo();
+		await this.renderNotes();
+	}
+
+	private updateFolderInfo(): void {
+		if (!this.folderInfoButton) return;
+
+		const folderPath = this.plugin.settings.folderPath?.trim() ?? "";
+		const count = this.allNotes.length;
+
+		let folderLabel = "Все хранилище";
+		if (folderPath) {
+			const trimmed = folderPath.replace(/\/+$/, "");
+			const parts = trimmed.split("/");
+			folderLabel = `${parts[parts.length - 1]}`;
+		}
+
+		this.folderInfoButton.empty();
+
+		const wrapper = this.folderInfoButton.createDiv(
+			"pinterest-gallery-folder-button",
+		);
+
+		const folderBlock = wrapper.createDiv(
+			"pinterest-gallery-folder-button-part",
+		);
+		const folderIconSpan = folderBlock.createSpan();
+		setIcon(folderIconSpan, "folder");
+		const folderTextSpan = folderBlock.createSpan();
+		folderTextSpan.setText(` ${folderLabel}`);
+
+		const dotSpan = wrapper.createSpan(
+			"pinterest-gallery-folder-button-separator",
+		);
+		dotSpan.setText("·");
+
+		const countBlock = wrapper.createDiv(
+			"pinterest-gallery-folder-button-part",
+		);
+		const noteIconSpan = countBlock.createSpan();
+		setIcon(noteIconSpan, "file-text");
+		const noteTextSpan = countBlock.createSpan();
+		noteTextSpan.setText(` ${count} заметок`);
+	}
+
 	private getFilteredNotes(): GalleryNoteCard[] {
 		let notes: GalleryNoteCard[];
 
@@ -401,13 +481,15 @@ export class PinterestGalleryView extends ItemView {
 			return;
 		}
 
-		const labelRow = this.tagFilterContainerEl.createDiv(
+		const filtersRow = this.tagFilterContainerEl.createDiv(
 			"pinterest-gallery-tags-label-row",
 		);
-		const labelLeft = labelRow.createSpan();
-		labelLeft.setText("Фильтр по тегам");
 
-		const sortButton = labelRow.createEl("button", {
+		const tagsRow = filtersRow.createDiv(
+			"pinterest-gallery-tags-row",
+		);
+
+		const sortButton = filtersRow.createEl("button", {
 			text:
 				this.sortOrder === "new-first"
 					? "Сначала новые"
@@ -425,10 +507,6 @@ export class PinterestGalleryView extends ItemView {
 			);
 			void this.renderNotes();
 		};
-
-		const tagsRow = this.tagFilterContainerEl.createDiv(
-			"pinterest-gallery-tags-row",
-		);
 
 		for (const tag of allTags) {
 			const chip = tagsRow.createEl("button", {
