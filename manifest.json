@@ -1,6 +1,6 @@
 {
-	"id": "pinterest-cards-gallery",
-	"name": "Pinterest Cards Gallery",
+	"id": "pinterest-notes-view",
+	"name": "Pinterest notes view",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Отображение заметок в виде Pinterest‑подобной галереи карточек.",
