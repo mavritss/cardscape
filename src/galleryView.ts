@@ -15,11 +15,13 @@ interface GalleryNoteCard {
 	title: string;
 	snippet: string;
 	tags: string[];
+	created: number;
 }
 
 export class PinterestGalleryView extends ItemView {
 	plugin: MyPlugin;
 	gridEl: HTMLElement | null = null;
+	sortOrder: "new-first" | "old-first" = "new-first";
 	tagFilterContainerEl: HTMLElement | null = null;
 	allNotes: GalleryNoteCard[] = [];
 	selectedTags: Set<string> = new Set();
@@ -65,7 +67,7 @@ export class PinterestGalleryView extends ItemView {
 		);
 
 		const tagsButton = controlsEl.createEl("button", {
-			text: "Теги",
+			text: "Показать фильтры",
 		});
 		tagsButton.addClass("pinterest-gallery-button");
 
@@ -80,6 +82,7 @@ export class PinterestGalleryView extends ItemView {
 
 		this.tagFilterContainerEl =
 			containerEl.createDiv("pinterest-gallery-tags");
+		this.tagFilterContainerEl.addClass("is-collapsed");
 
 		tagsButton.onclick = () => {
 			if (!this.tagFilterContainerEl) return;
@@ -87,6 +90,9 @@ export class PinterestGalleryView extends ItemView {
 				this.tagFilterContainerEl.hasClass("is-collapsed");
 			this.tagFilterContainerEl.toggleClass("is-collapsed", !isCollapsed);
 			tagsButton.toggleClass("is-active", !isCollapsed);
+			tagsButton.setText(
+				!isCollapsed ? "Показать фильтры" : "Скрыть фильтры",
+			);
 		};
 
 		this.gridEl = containerEl.createDiv("pinterest-gallery-grid");
@@ -111,8 +117,17 @@ export class PinterestGalleryView extends ItemView {
 			return;
 		}
 
-		for (const note of notes) {
-			const cardEl = this.gridEl.createDiv("pinterest-gallery-card");
+		const columnCount = this.getColumnCount();
+		const columns: HTMLElement[] = [];
+		for (let i = 0; i < columnCount; i++) {
+			const col = this.gridEl.createDiv("pinterest-gallery-column");
+			columns.push(col);
+		}
+
+		notes.forEach((note, index) => {
+			const column = columns[index % columnCount];
+			if (!column) return;
+			const cardEl = column.createDiv("pinterest-gallery-card");
 
 			// Картинка из первой вложенной картинки заметки (если есть)
 			const imageFile = this.findFirstImageForFile(note.file);
@@ -135,7 +150,8 @@ export class PinterestGalleryView extends ItemView {
 				"pinterest-gallery-card-snippet",
 			);
 			snippetEl.setText(note.snippet);
-
+			
+			// Теги карточки
 			if (note.tags.length) {
 				const tagsRow = cardEl.createDiv(
 					"pinterest-gallery-card-tags",
@@ -148,10 +164,15 @@ export class PinterestGalleryView extends ItemView {
 				}
 			}
 
+			// Время создания
+			const dateEl = cardEl.createDiv("pinterest-gallery-card-date");
+			const created = window.moment(note.created);
+			dateEl.setText(created.format("YYYY-MM-DD HH:mm:ss"));
+
 			cardEl.onclick = () => {
 				void this.openNote(note.file);
 			};
-		}
+		});
 	}
 
 	private async loadNotesFromFolder(): Promise<GalleryNoteCard[]> {
@@ -185,7 +206,11 @@ export class PinterestGalleryView extends ItemView {
 				content,
 			);
 			const tags = this.extractTags(file);
-			cards.push({ file, title, snippet, tags });
+			const created =
+				typeof file.stat.ctime === "number"
+					? file.stat.ctime
+					: file.stat.mtime;
+			cards.push({ file, title, snippet, tags, created });
 		}
 
 		// Можно сортировать по имени или по дате — пока оставим как есть
@@ -317,15 +342,39 @@ export class PinterestGalleryView extends ItemView {
 		return null;
 	}
 
+	private getColumnCount(): number {
+		const width =
+			this.gridEl?.clientWidth ??
+			this.containerEl?.clientWidth ??
+			window.innerWidth;
+
+		if (width < 700) return 1;
+		if (width < 1024) return 3;
+		// на больших экранах держим 6 колонок, чтобы сохранить текущий визуальный стиль
+		return 6;
+	}
+
 	private getFilteredNotes(): GalleryNoteCard[] {
+		let notes: GalleryNoteCard[];
+
 		if (!this.selectedTags.size) {
-			return this.allNotes;
+			notes = [...this.allNotes];
+		} else {
+			const required = Array.from(this.selectedTags);
+			notes = this.allNotes.filter((note) =>
+				required.every((tag) => note.tags.includes(tag)),
+			);
 		}
 
-		const required = Array.from(this.selectedTags);
-		return this.allNotes.filter((note) =>
-			required.every((tag) => note.tags.includes(tag)),
-		);
+		notes.sort((a, b) => {
+			if (this.sortOrder === "new-first") {
+				return b.created - a.created;
+			}
+			// old-first
+			return a.created - b.created;
+		});
+
+		return notes;
 	}
 
 	private renderTagFilters(): void {
@@ -355,9 +404,27 @@ export class PinterestGalleryView extends ItemView {
 		const labelRow = this.tagFilterContainerEl.createDiv(
 			"pinterest-gallery-tags-label-row",
 		);
-		labelRow.createSpan({
-			text: "Фильтр по тегам",
+		const labelLeft = labelRow.createSpan();
+		labelLeft.setText("Фильтр по тегам");
+
+		const sortButton = labelRow.createEl("button", {
+			text:
+				this.sortOrder === "new-first"
+					? "Сначала новые"
+					: "Сначала старые",
 		});
+		sortButton.addClass("pinterest-gallery-tag-sort-button");
+		sortButton.onclick = (evt) => {
+			evt.preventDefault();
+			this.sortOrder =
+				this.sortOrder === "new-first" ? "old-first" : "new-first";
+			sortButton.setText(
+				this.sortOrder === "new-first"
+					? "Сначала новые"
+					: "Сначала старые",
+			);
+			void this.renderNotes();
+		};
 
 		const tagsRow = this.tagFilterContainerEl.createDiv(
 			"pinterest-gallery-tags-row",
