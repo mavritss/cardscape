@@ -131,10 +131,12 @@ export class PinterestGalleryView extends ItemView {
 			return;
 		}
 
+		const columnsWrap = this.gridEl.createDiv("pinterest-gallery-columns");
+
 		const columnCount = this.getColumnCount();
 		const columns: HTMLElement[] = [];
 		for (let i = 0; i < columnCount; i++) {
-			const col = this.gridEl.createDiv("pinterest-gallery-column");
+			const col = columnsWrap.createDiv("pinterest-gallery-column");
 			columns.push(col);
 		}
 
@@ -164,7 +166,7 @@ export class PinterestGalleryView extends ItemView {
 				"pinterest-gallery-card-snippet",
 			);
 			snippetEl.setText(note.snippet);
-			
+
 			// Теги карточки
 			if (note.tags.length) {
 				const tagsRow = cardEl.createDiv(
@@ -179,14 +181,16 @@ export class PinterestGalleryView extends ItemView {
 			}
 
 			// Время создания
-			const dateEl = cardEl.createDiv("pinterest-gallery-card-date");
+			/* const dateEl = cardEl.createDiv("pinterest-gallery-card-date");
 			const created = window.moment(note.created);
-			dateEl.setText(created.format("YYYY-MM-DD HH:mm:ss"));
+			dateEl.setText(created.format("YYYY-MM-DD HH:mm:ss")); */
 
 			cardEl.onclick = () => {
 				void this.openNote(note.file);
 			};
 		});
+
+		this.renderFooter(notes.length);
 	}
 
 	private async loadNotesFromFolder(): Promise<GalleryNoteCard[]> {
@@ -265,10 +269,12 @@ export class PinterestGalleryView extends ItemView {
 		file: TFile,
 		content: string,
 	): { title: string; snippet: string } {
-		const lines = content.split(/\r?\n/);
+		const lines = content.replace(/^\uFEFF/, "").split(/\r?\n/);
+		const firstContentLineIdx = this.findContentStartLineIndex(lines);
 
 		let title = file.basename;
-		for (const line of lines) {
+		for (let i = firstContentLineIdx; i < lines.length; i++) {
+			const line = lines[i] ?? "";
 			const trimmed = line.trim();
 			if (trimmed.startsWith("# ")) {
 				title = trimmed.replace(/^#\s+/, "").trim();
@@ -277,13 +283,16 @@ export class PinterestGalleryView extends ItemView {
 		}
 
 		let snippet = "";
-		for (const line of lines) {
+		for (let i = firstContentLineIdx; i < lines.length; i++) {
+			const line = lines[i] ?? "";
 			const trimmed = line.trim();
 			if (!trimmed) continue;
 			if (trimmed.startsWith("#")) continue;
 			// Пропускаем строки, состоящие только из картинок/встроенных файлов,
 			// чтобы не показывать markdown‑синтаксис вроде ![[image.png]].
 			if (trimmed.startsWith("![[") || trimmed.startsWith("![")) continue;
+			// Пропускаем разделители properties/frontmatter, чтобы в snippet не попадало '---'.
+			if (trimmed === "---") continue;
 			snippet = trimmed;
 			break;
 		}
@@ -295,10 +304,64 @@ export class PinterestGalleryView extends ItemView {
 		}
 
 		if (title.length > 80) {
-			title = title.slice(0, 77) + "..."
+			title = title.slice(0, 77) + "...";
 		}
 
 		return { title, snippet };
+	}
+
+	/**
+	 * Если заметка начинается с блока properties/frontmatter (YAML между --- ... ---),
+	 * возвращает индекс первой строки после этого блока. Иначе возвращает 0.
+	 */
+	private findContentStartLineIndex(lines: string[]): number {
+		// Пропускаем пустые строки в начале
+		let i = 0;
+		while (i < lines.length && !lines[i]?.trim()) i++;
+
+		if ((lines[i] ?? "").trim() !== "---") return 0;
+
+		// Ищем закрывающий '---'
+		for (let j = i + 1; j < lines.length; j++) {
+			if ((lines[j] ?? "").trim() === "---") {
+				return j + 1;
+			}
+		}
+
+		// Если закрывающего разделителя нет — не считаем это frontmatter.
+		return 0;
+	}
+
+	private renderFooter(visibleCount: number): void {
+		if (!this.gridEl) return;
+
+		const footerEl = this.gridEl.createDiv("pinterest-gallery-footer");
+		const footerInner = footerEl.createDiv("pinterest-gallery-footer-inner");
+
+		const folderPathRaw = this.plugin.settings.folderPath?.trim() ?? "";
+		const folderPath = folderPathRaw
+			? folderPathRaw.replace(/\/+$/, "")
+			: "/";
+
+		const noteWord = this.getRuPlural(visibleCount, [
+			"заметку",
+			"заметки",
+			"заметок",
+		]);
+
+		footerInner.setText(
+			`Вы посмотрели все ваши ${visibleCount} ${noteWord} из папки "${folderPath}"`,
+		);
+	}
+
+	// Русская форма слова по числу: 1 заметку, 2-4 заметки, 5+ заметок
+	private getRuPlural(n: number, forms: [string, string, string]): string {
+		const abs = Math.abs(n) % 100;
+		const last = abs % 10;
+		if (abs > 10 && abs < 20) return forms[2];
+		if (last > 1 && last < 5) return forms[1];
+		if (last === 1) return forms[0];
+		return forms[2];
 	}
 
 	private extractTags(file: TFile): string[] {

@@ -98,8 +98,16 @@ Pinterest‑подобная галерея карточек заметок
 	flex: 1;
 	overflow: auto;
 	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 1.2rem;
+}
+
+.pinterest-gallery-columns {
+	display: flex;
 	align-items: flex-start;
 	gap: 1.2rem;
+	width: 100%;
 }
 
 .pinterest-gallery-column {
@@ -174,8 +182,8 @@ Pinterest‑подобная галерея карточек заметок
 	font-size: 0.8rem;
 	padding: 0.3rem 0.45rem;
 	border-radius: 999px;
-	background-color: var(--background-secondary);
-	color: var(--text-muted);
+	background-color: color-mix(in srgb, var(--link-color) 10%, var(--color-base-10));
+	color: var(--link-color);
 }
 
 .pinterest-gallery-empty {
@@ -227,6 +235,7 @@ Pinterest‑подобная галерея карточек заметок
 	border-color: var(--interactive-accent);
 	background-color: var(--interactive-accent);
 	color: var(--text-on-accent);
+	box-shadow: none;
 }
 
 .pinterest-gallery-tag-sort-button {
@@ -247,5 +256,27 @@ Pinterest‑подобная галерея карточек заметок
 .pinterest-gallery-tag-sort-button:hover {
 	border-color: var(--interactive-accent);
 	color: var(--text-normal);
+}
+
+.pinterest-gallery-footer {
+	width: 100%;
+	display: flex;
+	justify-content: center;
+	padding: 8rem 0 2.5rem;
+	color: var(--text-muted);
+}
+
+.pinterest-gallery-footer-inner {
+	text-align: center;
+	max-width: 52rem;
+	line-height: 1.45;
+	padding: 0.5rem 0.75rem;
+	border-radius: 999px;
+	border: 1px dashed var(--background-modifier-border);
+	background-color: color-mix(
+		in srgb,
+		var(--background-secondary) 85%,
+		transparent
+	);
 }
 
