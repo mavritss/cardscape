@@ -20,10 +20,30 @@ Pinterest‑подобная галерея карточек заметок
 	z-index: 20;
 	display: flex;
 	flex-direction: column;
-	gap: 0.6rem;
+	gap: 0.2rem;
 	padding: 1rem;
-	background: transparent;
+	background: none;
 	pointer-events: none;
+	overflow: visible;
+}
+
+.pinterest-gallery-topbar::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	height: 4.6rem;
+	border-bottom-left-radius: 1.4rem;
+	border-bottom-right-radius: 1.4rem;
+	background: linear-gradient(
+		to bottom,
+		var(--color-base-00) 0%,
+		color-mix(in srgb, var(--color-base-00) 85%, transparent) 45%,
+		transparent 100%
+	);
+	pointer-events: none;
+	z-index: -1;
 }
 
 .pinterest-gallery-header {
@@ -31,14 +51,14 @@ Pinterest‑подобная галерея карточек заметок
 	flex-wrap: wrap;
 	align-items: center;
 	justify-content: space-between;
-	gap: 0.75rem 1rem;
+	gap: 0.4rem;
 	pointer-events: none;
 }
 
 .pinterest-gallery-header-left {
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
+	gap: 0.4rem;
 	pointer-events: auto;
 }
 
@@ -62,16 +82,16 @@ Pinterest‑подобная галерея карточек заметок
 	margin-left: auto;
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
+	gap: 0.4rem;
 	pointer-events: auto;
 }
 
 .pinterest-gallery-header-left,
 .pinterest-gallery-header-controls {
-	padding: 0.35rem;
+	padding: 0.45rem;
 	border-radius: 999px;
 	background-color: var(--color-base-00);
-	border: 1px solid var(--background-modifier-border);
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
 }
 
 .pinterest-gallery-folder-button {
@@ -96,9 +116,10 @@ Pinterest‑подобная галерея карточек заметок
 	justify-content: center;
 	gap: 0.45rem;
 	line-height: 1;
-	padding: 0.7rem 0.85rem;
+	padding: 1.2rem 0.85rem;
 	font-size: 0.9rem;
 	border-radius: 999px;
+	background-color: var(--color-base-00);
 	border: 1px solid var(--interactive-normal);
 	background-color: var(--background-secondary);
 	color: var(--text-normal);
@@ -122,18 +143,20 @@ Pinterest‑подобная галерея карточек заметок
 }
 
 .pinterest-gallery-button.is-active {
-	border-color: var(--interactive-accent);
+	background-color: var(--color-base-00);
+	border-color: color-mix(in srgb, var(--color-base-100) 60%, transparent);
 	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
 }
 
 .pinterest-gallery-button:hover {
-	background-color: var(--interactive-hover);
-	border-color: var(--interactive-accent);
+	background-color: var(--color-base-15);
+	border-color: color-mix(in srgb, var(--color-base-100) 60%, transparent);
 	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
 	transform: translateY(-1px);
 }
 
 .pinterest-gallery-button:active {
+	background-color: var(--color-base-15);
 	transform: translateY(0);
 	box-shadow: none;
 }
@@ -149,7 +172,7 @@ Pinterest‑подобная галерея карточек заметок
 	align-items: stretch;
 	gap: 1.2rem;
 	/* Даем место под оверлейный topbar, чтобы он не закрывал первые карточки */
-	padding-top: calc(1.5rem + 4.2rem);
+	padding-top: 7rem;
 }
 
 .pinterest-gallery-columns {
@@ -240,20 +263,17 @@ Pinterest‑подобная галерея карточек заметок
 }
 
 .pinterest-gallery-tags {
-	margin-top: 0.25rem;
-	margin-bottom: 0.25rem;
+	margin-top: 0.5rem;
 	display: flex;
+	align-self: flex-start;
 	flex-direction: column;
 	gap: 0.4rem;
-	padding: 0.6rem 0.65rem;
+	padding: 0.55rem;
 	border-radius: 1rem;
-	border: 1px solid var(--background-modifier-border);
-	background-color: color-mix(
-		in srgb,
-		var(--background-secondary) 92%,
-		transparent
-	);
+	border: 1px solid color-mix(in srgb, var(--link-color) 15%, transparent);
+	background-color: color-mix(in srgb, var(--link-color) 15%, transparent);
 	pointer-events: auto;
+	backdrop-filter: blur(20px);
 }
 
 .pinterest-gallery-tags.is-collapsed {
@@ -267,12 +287,12 @@ Pinterest‑подобная галерея карточек заметок
 }
 
 .pinterest-gallery-tag-chip {
-	border-radius: 999px;
-	border: 1px solid var(--background-modifier-border);
+	border: solid 1px transparent;
+	border-radius: 0.8rem;
 	background-color: var(--background-secondary);
 	color: var(--text-muted);
 	font-size: 0.8rem;
-	padding: 0.15rem 0.55rem;
+	padding: 1.1rem 0.6rem;
 	cursor: pointer;
 	transition:
 		background-color 120ms ease,
@@ -281,8 +301,8 @@ Pinterest‑подобная галерея карточек заметок
 }
 
 .pinterest-gallery-tag-chip.is-selected {
-	border-color: var(--interactive-accent);
-	background-color: var(--interactive-accent);
+	border: solid 1px color-mix(in srgb, var(--link-color) 50%, transparent);
+	background-color: transparent;
 	color: var(--text-on-accent);
 	box-shadow: none;
 }
@@ -293,24 +313,10 @@ Pinterest‑подобная галерея карточек заметок
 	gap: 0.5rem;
 }
 
-.pinterest-gallery-sort-icons {
-	display: inline-flex;
-	flex-direction: column;
-	align-items: center;
-	line-height: 1;
-	gap: 2px;
-	opacity: 0.85;
-}
-
 .pinterest-gallery-sort-icon svg {
 	width: 12px;
 	height: 12px;
 	display: block;
-}
-
-.pinterest-gallery-sort-icon.is-active {
-	opacity: 1;
-	color: var(--text-normal);
 }
 
 .pinterest-gallery-sort-text {

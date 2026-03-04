@@ -575,14 +575,8 @@ export class PinterestGalleryView extends ItemView {
 			"pinterest-gallery-sort-button",
 		);
 
-		const icons = wrap.createSpan("pinterest-gallery-sort-icons");
-		const up = icons.createSpan("pinterest-gallery-sort-icon is-up");
-		setIcon(up, "chevron-up");
-		const down = icons.createSpan("pinterest-gallery-sort-icon is-down");
-		setIcon(down, "chevron-down");
-
-		up.toggleClass("is-active", this.sortOrder === "old-first");
-		down.toggleClass("is-active", this.sortOrder === "new-first");
+		const icon = wrap.createSpan("pinterest-gallery-sort-icon");
+		setIcon(icon, "arrow-up-down");
 
 		const text = wrap.createSpan("pinterest-gallery-sort-text");
 		text.setText(
