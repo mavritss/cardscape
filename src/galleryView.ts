@@ -1,5 +1,4 @@
 import {
-	App,
 	ItemView,
 	TFile,
 	TFolder,
@@ -27,6 +26,9 @@ export class PinterestGalleryView extends ItemView {
 	allNotes: GalleryNoteCard[] = [];
 	selectedTags: Set<string> = new Set();
 	folderInfoButton: HTMLButtonElement | null = null;
+	tagsInfoButton: HTMLButtonElement | null = null;
+	sortOrderButton: HTMLButtonElement | null = null;
+	private allAvailableTags: string[] = [];
 
 	constructor(leaf: WorkspaceLeaf, plugin: MyPlugin) {
 		super(leaf);
@@ -51,7 +53,8 @@ export class PinterestGalleryView extends ItemView {
 		containerEl.empty();
 		containerEl.addClass("pinterest-gallery-view");
 
-		const headerEl = containerEl.createDiv("pinterest-gallery-header");
+		const topbarEl = containerEl.createDiv("pinterest-gallery-topbar");
+		const headerEl = topbarEl.createDiv("pinterest-gallery-header");
 
 		const headerLeftEl = headerEl.createDiv(
 			"pinterest-gallery-header-left",
@@ -76,14 +79,35 @@ export class PinterestGalleryView extends ItemView {
 			this.plugin.openSettings();
 		};
 
+		// Кнопка с тегами (иконка + N тегов), открывает/скрывает панель фильтров ниже
+		const tagsButton = headerLeftEl.createEl("button", {
+			attr: { "aria-label": "Фильтры по тегам" },
+		});
+		tagsButton.addClass("pinterest-gallery-button");
+		this.tagsInfoButton = tagsButton;
+		tagsButton.onclick = (evt) => {
+			evt.preventDefault();
+			this.toggleTagPanel();
+		};
+
 		const controlsEl = headerEl.createDiv(
 			"pinterest-gallery-header-controls",
 		);
 
-		const tagsButton = controlsEl.createEl("button", {
-			text: "Показать фильтры",
+		// Кнопка сортировки (вместо старой кнопки "Показать/Скрыть фильтры")
+		const sortButton = controlsEl.createEl("button", {
+			attr: { "aria-label": "Сортировка заметок" },
 		});
-		tagsButton.addClass("pinterest-gallery-button");
+		sortButton.addClass("pinterest-gallery-button");
+		this.sortOrderButton = sortButton;
+		this.renderSortButton();
+		sortButton.onclick = (evt) => {
+			evt.preventDefault();
+			this.sortOrder =
+				this.sortOrder === "new-first" ? "old-first" : "new-first";
+			this.renderSortButton();
+			void this.renderNotes();
+		};
 
 		const settingsButton = controlsEl.createEl("button", {
 			attr: { "aria-label": "Настройки галереи" },
@@ -97,19 +121,8 @@ export class PinterestGalleryView extends ItemView {
 		};
 
 		this.tagFilterContainerEl =
-			containerEl.createDiv("pinterest-gallery-tags");
+			topbarEl.createDiv("pinterest-gallery-tags");
 		this.tagFilterContainerEl.addClass("is-collapsed");
-
-		tagsButton.onclick = () => {
-			if (!this.tagFilterContainerEl) return;
-			const isCollapsed =
-				this.tagFilterContainerEl.hasClass("is-collapsed");
-			this.tagFilterContainerEl.toggleClass("is-collapsed", !isCollapsed);
-			tagsButton.toggleClass("is-active", !isCollapsed);
-			tagsButton.setText(
-				!isCollapsed ? "Показать фильтры" : "Скрыть фильтры",
-			);
-		};
 
 		this.gridEl = containerEl.createDiv("pinterest-gallery-grid");
 
@@ -453,6 +466,7 @@ export class PinterestGalleryView extends ItemView {
 		this.allNotes = await this.loadNotesFromFolder();
 		this.renderTagFilters();
 		this.updateFolderInfo();
+		this.updateTagsInfo();
 		await this.renderNotes();
 	}
 
@@ -497,6 +511,85 @@ export class PinterestGalleryView extends ItemView {
 		noteTextSpan.setText(` ${count} заметок`);
 	}
 
+	private updateTagsInfo(): void {
+		if (!this.tagsInfoButton) return;
+
+		const selectedCount = this.selectedTags.size;
+		const totalCount = this.allAvailableTags.length;
+
+		this.tagsInfoButton.empty();
+
+		const wrapper = this.tagsInfoButton.createDiv(
+			"pinterest-gallery-folder-button",
+		);
+
+		const tagBlock = wrapper.createDiv(
+			"pinterest-gallery-folder-button-part",
+		);
+		const tagIconSpan = tagBlock.createSpan();
+		setIcon(tagIconSpan, "tag");
+		const tagTextSpan = tagBlock.createSpan();
+		const tagWord = this.getRuPlural(totalCount, ["тег", "тега", "тегов"]);
+		tagTextSpan.setText(` ${totalCount} ${tagWord}`);
+
+		if (selectedCount > 0) {
+			const dotSpan = wrapper.createSpan(
+				"pinterest-gallery-folder-button-separator",
+			);
+			dotSpan.setText("·");
+
+			const selectedBlock = wrapper.createDiv(
+				"pinterest-gallery-folder-button-part",
+			);
+			const selectedIconSpan = selectedBlock.createSpan();
+			setIcon(selectedIconSpan, "check");
+			const selectedTextSpan = selectedBlock.createSpan();
+			const selectedWord = this.getRuPlural(selectedCount, [
+				"выбран",
+				"выбрано",
+				"выбрано",
+			]);
+			selectedTextSpan.setText(` ${selectedCount} ${selectedWord}`);
+			this.tagsInfoButton.addClass("is-active");
+		} else {
+			this.tagsInfoButton.removeClass("is-active");
+		}
+
+		// Если тегов нет — визуально делаем кнопку "приглушённой"
+		this.tagsInfoButton.toggleClass("is-disabled", totalCount === 0);
+	}
+
+	private toggleTagPanel(): void {
+		if (!this.tagFilterContainerEl) return;
+
+		const isCollapsed = this.tagFilterContainerEl.hasClass("is-collapsed");
+		this.tagFilterContainerEl.toggleClass("is-collapsed", !isCollapsed);
+	}
+
+	private renderSortButton(): void {
+		if (!this.sortOrderButton) return;
+
+		this.sortOrderButton.empty();
+
+		const wrap = this.sortOrderButton.createDiv(
+			"pinterest-gallery-sort-button",
+		);
+
+		const icons = wrap.createSpan("pinterest-gallery-sort-icons");
+		const up = icons.createSpan("pinterest-gallery-sort-icon is-up");
+		setIcon(up, "chevron-up");
+		const down = icons.createSpan("pinterest-gallery-sort-icon is-down");
+		setIcon(down, "chevron-down");
+
+		up.toggleClass("is-active", this.sortOrder === "old-first");
+		down.toggleClass("is-active", this.sortOrder === "new-first");
+
+		const text = wrap.createSpan("pinterest-gallery-sort-text");
+		text.setText(
+			this.sortOrder === "new-first" ? "Сначала новые" : "Сначала старые",
+		);
+	}
+
 	private getFilteredNotes(): GalleryNoteCard[] {
 		let notes: GalleryNoteCard[];
 
@@ -534,6 +627,8 @@ export class PinterestGalleryView extends ItemView {
 		}
 
 		const allTags = Array.from(tagSet).sort();
+		this.allAvailableTags = allTags;
+		this.updateTagsInfo();
 
 		if (!allTags.length) {
 			this.tagFilterContainerEl.addClass("is-collapsed");
@@ -544,32 +639,9 @@ export class PinterestGalleryView extends ItemView {
 			return;
 		}
 
-		const filtersRow = this.tagFilterContainerEl.createDiv(
-			"pinterest-gallery-tags-label-row",
-		);
-
-		const tagsRow = filtersRow.createDiv(
+		const tagsRow = this.tagFilterContainerEl.createDiv(
 			"pinterest-gallery-tags-row",
 		);
-
-		const sortButton = filtersRow.createEl("button", {
-			text:
-				this.sortOrder === "new-first"
-					? "Сначала новые"
-					: "Сначала старые",
-		});
-		sortButton.addClass("pinterest-gallery-tag-sort-button");
-		sortButton.onclick = (evt) => {
-			evt.preventDefault();
-			this.sortOrder =
-				this.sortOrder === "new-first" ? "old-first" : "new-first";
-			sortButton.setText(
-				this.sortOrder === "new-first"
-					? "Сначала новые"
-					: "Сначала старые",
-			);
-			void this.renderNotes();
-		};
 
 		for (const tag of allTags) {
 			const chip = tagsRow.createEl("button", {
@@ -590,6 +662,7 @@ export class PinterestGalleryView extends ItemView {
 					chip.addClass("is-selected");
 				}
 
+				this.updateTagsInfo();
 				void this.renderNotes();
 			};
 		}
@@ -600,6 +673,10 @@ export class PinterestGalleryView extends ItemView {
 		this.tagFilterContainerEl = null;
 		this.allNotes = [];
 		this.selectedTags.clear();
+		this.folderInfoButton = null;
+		this.tagsInfoButton = null;
+		this.sortOrderButton = null;
+		this.allAvailableTags = [];
 	}
 }
 
