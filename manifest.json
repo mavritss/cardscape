@@ -1,9 +1,9 @@
 {
-	"id": "pinterest-notes-view",
-	"name": "Pinterest notes view",
+	"id": "cardscape",
+	"name": "Cardscape",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Отображение заметок в виде Pinterest‑подобной галереи карточек.",
+	"description": "Turns your chosen folder into a Pinterest-like notes feed",
 	"author": "tema mavrits",
 	"isDesktopOnly": false
 }

@@ -7,6 +7,7 @@ import {
 	setIcon,
 } from "obsidian";
 import type MyPlugin from "./main";
+import { resolveUiLanguage, type ResolvedUiLanguage } from "./i18n";
 
 export const GALLERY_VIEW_TYPE = "pinterest-cards-gallery-view";
 
@@ -18,7 +19,7 @@ interface GalleryNoteCard {
 	created: number;
 }
 
-export class PinterestGalleryView extends ItemView {
+export class Cardscape extends ItemView {
 	plugin: MyPlugin;
 	gridEl: HTMLElement | null = null;
 	sortOrder: "new-first" | "old-first" = "new-first";
@@ -29,6 +30,7 @@ export class PinterestGalleryView extends ItemView {
 	tagsInfoButton: HTMLButtonElement | null = null;
 	sortOrderButton: HTMLButtonElement | null = null;
 	private allAvailableTags: string[] = [];
+	private currentLang: ResolvedUiLanguage = "ru";
 
 	constructor(leaf: WorkspaceLeaf, plugin: MyPlugin) {
 		super(leaf);
@@ -49,6 +51,12 @@ export class PinterestGalleryView extends ItemView {
 	}
 
 	async onOpen(): Promise<void> {
+		// На открытии вида фиксируем язык интерфейса.
+		this.currentLang = resolveUiLanguage(
+			this.app,
+			this.plugin.settings.language,
+		);
+
 		const { containerEl } = this;
 		containerEl.empty();
 		containerEl.addClass("pinterest-gallery-view");
@@ -62,7 +70,12 @@ export class PinterestGalleryView extends ItemView {
 
 		// Кнопка обновления
 		const refreshButton = headerLeftEl.createEl("button", {
-			attr: { "aria-label": "Обновить галерею" },
+			attr: {
+				"aria-label":
+					this.currentLang === "ru"
+						? "Обновить галерею"
+						: "Refresh gallery",
+			},
 		});
 		refreshButton.addClass("pinterest-gallery-button");
 		const refreshIconSpan = refreshButton.createSpan();
@@ -81,7 +94,12 @@ export class PinterestGalleryView extends ItemView {
 
 		// Кнопка с тегами (иконка + N тегов), открывает/скрывает панель фильтров ниже
 		const tagsButton = headerLeftEl.createEl("button", {
-			attr: { "aria-label": "Фильтры по тегам" },
+			attr: {
+				"aria-label":
+					this.currentLang === "ru"
+						? "Фильтры по тегам"
+						: "Tag filters",
+			},
 		});
 		tagsButton.addClass("pinterest-gallery-button");
 		this.tagsInfoButton = tagsButton;
@@ -96,7 +114,12 @@ export class PinterestGalleryView extends ItemView {
 
 		// Кнопка сортировки (вместо старой кнопки "Показать/Скрыть фильтры")
 		const sortButton = controlsEl.createEl("button", {
-			attr: { "aria-label": "Сортировка заметок" },
+			attr: {
+				"aria-label":
+					this.currentLang === "ru"
+						? "Сортировка заметок"
+						: "Sort notes",
+			},
 		});
 		sortButton.addClass("pinterest-gallery-button");
 		this.sortOrderButton = sortButton;
@@ -110,7 +133,12 @@ export class PinterestGalleryView extends ItemView {
 		};
 
 		const settingsButton = controlsEl.createEl("button", {
-			attr: { "aria-label": "Настройки галереи" },
+			attr: {
+				"aria-label":
+					this.currentLang === "ru"
+						? "Настройки галереи"
+						: "Gallery settings",
+			},
 		});
 		settingsButton.addClass("pinterest-gallery-button");
 		const settingsIconSpan = settingsButton.createSpan();
@@ -139,7 +167,9 @@ export class PinterestGalleryView extends ItemView {
 		if (!notes.length) {
 			const emptyEl = this.gridEl.createDiv("pinterest-gallery-empty");
 			emptyEl.setText(
-				"В выбранной папке нет заметок. Выберите другую папку в настройках плагина.",
+				this.currentLang === "ru"
+					? "В выбранной папке нет заметок. Выберите другую папку в настройках плагина."
+					: "There are no notes in the selected folder. Choose another folder in the plugin settings.",
 			);
 			return;
 		}
@@ -214,11 +244,19 @@ export class PinterestGalleryView extends ItemView {
 		if (folderPath) {
 			const maybeFolder = vault.getAbstractFileByPath(folderPath);
 			if (!maybeFolder) {
-				new Notice(`Папка "${folderPath}" не найдена.`);
+				new Notice(
+					this.currentLang === "ru"
+						? `Папка "${folderPath}" не найдена.`
+						: `Folder "${folderPath}" was not found.`,
+				);
 				return [];
 			}
 			if (!(maybeFolder instanceof TFolder)) {
-				new Notice(`"${folderPath}" — это не папка.`);
+				new Notice(
+					this.currentLang === "ru"
+						? `"${folderPath}" — это не папка.`
+						: `"${folderPath}" is not a folder.`,
+				);
 				return [];
 			}
 			root = maybeFolder;
@@ -311,7 +349,10 @@ export class PinterestGalleryView extends ItemView {
 		}
 
 		if (!snippet) {
-			snippet = "Пустая заметка";
+			snippet =
+				this.currentLang === "ru"
+					? "Пустая заметка"
+					: "Empty note";
 		} else if (snippet.length > 280) {
 			snippet = snippet.slice(0, 277) + "...";
 		}
@@ -356,18 +397,27 @@ export class PinterestGalleryView extends ItemView {
 			? folderPathRaw.replace(/\/+$/, "")
 			: "/";
 
-		const noteWord = this.getRuPlural(visibleCount, [
-			"заметку",
-			"заметки",
-			"заметок",
-		]);
+		if (this.currentLang === "ru") {
+			const noteWord = this.getRuPlural(visibleCount, [
+				"заметку",
+				"заметки",
+				"заметок",
+			]);
 
-		footerInner.setText(
-			`Вы посмотрели все ваши ${visibleCount} ${noteWord} из папки "${folderPath}"`,
-		);
+			footerInner.setText(
+				`Вы посмотрели все ваши ${visibleCount} ${noteWord} из папки "${folderPath}"`,
+			);
+		} else {
+			const noteWord = visibleCount === 1 ? "note" : "notes";
+			const baseFolder =
+				folderPath === "/" ? "your vault" : `the "${folderPath}" folder`;
+			footerInner.setText(
+				`You’ve reached the end of your ${visibleCount} ${noteWord} from ${baseFolder}.`,
+			);
+		}
 	}
 
-	// Русская форма слова по числу: 1 заметку, 2-4 заметки, 5+ заметок
+	// Русская форма слова по числу: 1 заметку, 2‑4 заметки, 5+ заметок
 	private getRuPlural(n: number, forms: [string, string, string]): string {
 		const abs = Math.abs(n) % 100;
 		const last = abs % 10;
@@ -476,7 +526,8 @@ export class PinterestGalleryView extends ItemView {
 		const folderPath = this.plugin.settings.folderPath?.trim() ?? "";
 		const count = this.allNotes.length;
 
-		let folderLabel = "Все хранилище";
+		let folderLabel =
+			this.currentLang === "ru" ? "Все хранилище" : "Whole vault";
 		if (folderPath) {
 			const trimmed = folderPath.replace(/\/+$/, "");
 			const parts = trimmed.split("/");
@@ -508,7 +559,12 @@ export class PinterestGalleryView extends ItemView {
 		const noteIconSpan = countBlock.createSpan();
 		setIcon(noteIconSpan, "file-text");
 		const noteTextSpan = countBlock.createSpan();
-		noteTextSpan.setText(` ${count} заметок`);
+		if (this.currentLang === "ru") {
+			noteTextSpan.setText(` ${count} заметок`);
+		} else {
+			const word = count === 1 ? "note" : "notes";
+			noteTextSpan.setText(` ${count} ${word}`);
+		}
 	}
 
 	private updateTagsInfo(): void {
@@ -529,8 +585,17 @@ export class PinterestGalleryView extends ItemView {
 		const tagIconSpan = tagBlock.createSpan();
 		setIcon(tagIconSpan, "tag");
 		const tagTextSpan = tagBlock.createSpan();
-		const tagWord = this.getRuPlural(totalCount, ["тег", "тега", "тегов"]);
-		tagTextSpan.setText(` ${totalCount} ${tagWord}`);
+		if (this.currentLang === "ru") {
+			const tagWord = this.getRuPlural(totalCount, [
+				"тег",
+				"тега",
+				"тегов",
+			]);
+			tagTextSpan.setText(` ${totalCount} ${tagWord}`);
+		} else {
+			const tagWord = totalCount === 1 ? "tag" : "tags";
+			tagTextSpan.setText(` ${totalCount} ${tagWord}`);
+		}
 
 		if (selectedCount > 0) {
 			const dotSpan = wrapper.createSpan(
@@ -544,12 +609,17 @@ export class PinterestGalleryView extends ItemView {
 			const selectedIconSpan = selectedBlock.createSpan();
 			setIcon(selectedIconSpan, "check");
 			const selectedTextSpan = selectedBlock.createSpan();
-			const selectedWord = this.getRuPlural(selectedCount, [
-				"выбран",
-				"выбрано",
-				"выбрано",
-			]);
-			selectedTextSpan.setText(` ${selectedCount} ${selectedWord}`);
+			if (this.currentLang === "ru") {
+				const selectedWord = this.getRuPlural(selectedCount, [
+					"выбран",
+					"выбрано",
+					"выбрано",
+				]);
+				selectedTextSpan.setText(` ${selectedCount} ${selectedWord}`);
+			} else {
+				const word = selectedCount === 1 ? "selected" : "selected";
+				selectedTextSpan.setText(` ${selectedCount} ${word}`);
+			}
 			this.tagsInfoButton.addClass("is-active");
 		} else {
 			this.tagsInfoButton.removeClass("is-active");
@@ -579,9 +649,19 @@ export class PinterestGalleryView extends ItemView {
 		setIcon(icon, "arrow-up-down");
 
 		const text = wrap.createSpan("pinterest-gallery-sort-text");
-		text.setText(
-			this.sortOrder === "new-first" ? "Сначала новые" : "Сначала старые",
-		);
+		if (this.currentLang === "ru") {
+			text.setText(
+				this.sortOrder === "new-first"
+					? "Сначала новые"
+					: "Сначала старые",
+			);
+		} else {
+			text.setText(
+				this.sortOrder === "new-first"
+					? "Newest first"
+					: "Oldest first",
+			);
+		}
 	}
 
 	private getFilteredNotes(): GalleryNoteCard[] {
@@ -629,7 +709,11 @@ export class PinterestGalleryView extends ItemView {
 			const emptyEl = this.tagFilterContainerEl.createDiv(
 				"pinterest-gallery-tags-empty",
 			);
-			emptyEl.setText("Теги пока не найдены.");
+			emptyEl.setText(
+				this.currentLang === "ru"
+					? "Теги пока не найдены."
+					: "No tags were found yet.",
+			);
 			return;
 		}
 

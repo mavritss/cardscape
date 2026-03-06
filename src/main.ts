@@ -4,25 +4,33 @@ import {
 	GalleryPluginSettings,
 	GallerySettingTab,
 } from "./settings";
-import {
-	GALLERY_VIEW_TYPE,
-	PinterestGalleryView,
-} from "./galleryView";
+import { GALLERY_VIEW_TYPE, Cardscape } from "./galleryView";
+import { resolveUiLanguage } from "./i18n";
 
 export default class MyPlugin extends Plugin {
 	settings: GalleryPluginSettings;
 
 	async onload() {
+		// Загружаем настройки плагина (или применяем значения по умолчанию).
 		await this.loadSettings();
+
+		// Определяем язык интерфейса для команд и подсказок.
+		const lang = resolveUiLanguage(this.app, this.settings.language);
+
+		const ribbonTitle =
+			lang === "ru"
+				? "Открыть Pinterest‑галерею заметок"
+				: "Open Pinterest‑style notes gallery";
+		const commandName = ribbonTitle;
 
 		this.registerView(
 			GALLERY_VIEW_TYPE,
-			(leaf: WorkspaceLeaf) => new PinterestGalleryView(leaf, this),
+			(leaf: WorkspaceLeaf) => new Cardscape(leaf, this),
 		);
 
 		this.addRibbonIcon(
 			"layout-grid",
-			"Открыть Pinterest‑галерею заметок",
+			ribbonTitle,
 			() => {
 				this.activateGalleryView();
 			},
@@ -30,7 +38,7 @@ export default class MyPlugin extends Plugin {
 
 		this.addCommand({
 			id: "open-pinterest-gallery",
-			name: "Открыть Pinterest‑галерею заметок",
+			name: commandName,
 			callback: () => this.activateGalleryView(),
 		});
 
