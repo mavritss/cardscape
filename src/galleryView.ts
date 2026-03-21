@@ -31,7 +31,7 @@ export class Cardscape extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return "Pinterest cards gallery";
+		return "Cardscape";
 	}
 
 	getIcon(): string {
@@ -74,7 +74,14 @@ export class Cardscape extends ItemView {
 		};
 
 		// Folder button with note count.
-		const folderButton = headerLeftEl.createEl("button");
+		const folderButton = headerLeftEl.createEl("button", {
+			attr: {
+				"aria-label":
+					this.currentLang === "ru"
+						? "Выбранная папка"
+						: "Choosen folder",
+			},
+		});
 		folderButton.addClass("pinterest-gallery-button");
 		this.folderInfoButton = folderButton;
 		folderButton.onclick = () => {
