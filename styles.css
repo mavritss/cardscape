@@ -1,5 +1,5 @@
 /*
-Pinterest‑подобная галерея карточек заметок
+Pinterest-like gallery card layout
 */
 
 .pinterest-gallery-view {
@@ -162,7 +162,7 @@ Pinterest‑подобная галерея карточек заметок
 }
 
 .pinterest-gallery-grid {
-	/* Контейнер для колонок с карточками */
+	/* Container for masonry columns with cards */
 	padding: 1.5rem 2rem;
 	width: 100%;
 	flex: 1;
@@ -171,7 +171,7 @@ Pinterest‑подобная галерея карточек заметок
 	flex-direction: column;
 	align-items: stretch;
 	gap: 1.2rem;
-	/* Даем место под оверлейный topbar, чтобы он не закрывал первые карточки */
+	/* Reserve space for overlay topbar to avoid covering first cards */
 	padding-top: 7rem;
 }
 

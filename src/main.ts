@@ -11,10 +11,10 @@ export default class MyPlugin extends Plugin {
 	settings: GalleryPluginSettings;
 
 	async onload() {
-		// Загружаем настройки плагина (или применяем значения по умолчанию).
+		// Load saved settings or fall back to defaults.
 		await this.loadSettings();
 
-		// Определяем язык интерфейса для команд и подсказок.
+		// Resolve UI language for command and ribbon labels.
 		const lang = resolveUiLanguage(this.app, this.settings.language);
 
 		const ribbonTitle =
@@ -68,8 +68,7 @@ export default class MyPlugin extends Plugin {
 
 		let leaf = workspace.getLeavesOfType(GALLERY_VIEW_TYPE)[0];
 		if (!leaf) {
-			// Открываем галерею в основной области (как обычную заметку),
-			// а не в правом сайдбаре.
+			// Open gallery in the main editor area, not the right sidebar.
 			leaf = workspace.getLeaf(true);
 			await leaf.setViewState({
 				type: GALLERY_VIEW_TYPE,
@@ -81,8 +80,8 @@ export default class MyPlugin extends Plugin {
 	}
 
 	openSettings() {
-		// В некоторых версиях типов Obsidian поле `setting` может не быть описано,
-		// поэтому аккуратно приводим к any, чтобы избежать ошибок TypeScript.
+		// In some Obsidian type versions `setting` is not declared.
+		// Cast to any to keep compatibility and avoid TS errors.
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const anyApp = this.app as any;
 		if (anyApp.setting) {

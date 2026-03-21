@@ -5,5 +5,6 @@
 	"minAppVersion": "0.15.0",
 	"description": "Turns your chosen folder into a Pinterest-like notes feed",
 	"author": "tema mavrits",
+	"fundingUrl": "https://ko-fi.com/mavrits",
 	"isDesktopOnly": false
 }

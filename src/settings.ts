@@ -6,8 +6,8 @@ export interface GalleryPluginSettings {
 	folderPath: string;
 	maxNotes: number;
 	/**
-	 * Предпочитаемый язык интерфейса плагина.
-	 * Хранится в настройках и используется при выборе надписей/подсказок.
+	 * Preferred plugin UI language.
+	 * Saved in settings and used for labels/tooltips.
 	 */
 	language: UiLanguage;
 }
@@ -29,8 +29,8 @@ export class GallerySettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 
-		// Определяем текущий язык интерфейса для надписей настроек.
-		// При "auto" ориентируемся на язык Obsidian.
+		// Resolve current UI language for settings labels.
+		// When language is "auto", use Obsidian locale.
 		const lang = this.getCurrentLanguage();
 
 		containerEl.empty();
@@ -39,7 +39,7 @@ export class GallerySettingTab extends PluginSettingTab {
 			text: "Cardscape",
 		});
 
-		// Настройка: целевая папка для заметок
+		// Setting: target folder for notes.
 		new Setting(containerEl)
 			.setName(
 				lang === "ru" ? "Папка с заметками" : "Notes folder",
@@ -63,7 +63,7 @@ export class GallerySettingTab extends PluginSettingTab {
 					}),
 			);
 
-		// Настройка: ограничение количества заметок
+		// Setting: note count limit.
 		new Setting(containerEl)
 			.setName(
 				lang === "ru"
@@ -92,7 +92,7 @@ export class GallerySettingTab extends PluginSettingTab {
 					}),
 			);
 
-		// Настройка: язык интерфейса плагина
+		// Setting: plugin UI language.
 		const languageSetting = new Setting(containerEl).setName(
 			lang === "ru" ? "Язык интерфейса" : "Interface language",
 		);
@@ -116,17 +116,17 @@ export class GallerySettingTab extends PluginSettingTab {
 					this.plugin.settings.language = value as UiLanguage;
 					await this.plugin.saveSettings();
 
-					// Перерисовываем таб, чтобы сразу показать текст на новом языке.
+					// Re-render tab to apply language change immediately.
 					this.display();
 				});
 		});
 	}
 
 	/**
-	 * Вспомогательный метод: возвращает фактический язык интерфейса для экрана настроек.
+	 * Helper: returns the effective UI language for settings screen.
 	 */
 	private getCurrentLanguage() {
-		// Ленивая загрузка, чтобы избежать лишних зависимостей здесь.
+		// Lazy import to avoid unnecessary dependencies in this module.
 		const { resolveUiLanguage } = require("./i18n") as typeof import("./i18n");
 		return resolveUiLanguage(this.app, this.plugin.settings.language);
 	}

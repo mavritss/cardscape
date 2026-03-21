@@ -1,28 +1,17 @@
-import {
-	ItemView,
-	TFile,
-	TFolder,
-	WorkspaceLeaf,
-	Notice,
-	setIcon,
-} from "obsidian";
+import { ItemView, TFile, WorkspaceLeaf, setIcon } from "obsidian";
 import type MyPlugin from "./main";
 import { resolveUiLanguage, type ResolvedUiLanguage } from "./i18n";
+import type { GalleryNoteCard, GallerySortOrder } from "./gallery/types";
+import { loadNotesFromFolder, findFirstImageForFile } from "./gallery/notes";
+import { collectAvailableTags, getFilteredNotes } from "./gallery/filters";
+import { getColumnCountFromWidth } from "./gallery/layout";
 
 export const GALLERY_VIEW_TYPE = "pinterest-cards-gallery-view";
-
-interface GalleryNoteCard {
-	file: TFile;
-	title: string;
-	snippet: string;
-	tags: string[];
-	created: number;
-}
 
 export class Cardscape extends ItemView {
 	plugin: MyPlugin;
 	gridEl: HTMLElement | null = null;
-	sortOrder: "new-first" | "old-first" = "new-first";
+	sortOrder: GallerySortOrder = "new-first";
 	tagFilterContainerEl: HTMLElement | null = null;
 	allNotes: GalleryNoteCard[] = [];
 	selectedTags: Set<string> = new Set();
@@ -46,12 +35,12 @@ export class Cardscape extends ItemView {
 	}
 
 	getIcon(): string {
-		// Built‑in icon, can be changed later
+		// Built-in icon, can be changed later.
 		return "layout-grid";
 	}
 
 	async onOpen(): Promise<void> {
-		// На открытии вида фиксируем язык интерфейса.
+		// Resolve UI language when the view opens.
 		this.currentLang = resolveUiLanguage(
 			this.app,
 			this.plugin.settings.language,
@@ -68,7 +57,7 @@ export class Cardscape extends ItemView {
 			"pinterest-gallery-header-left",
 		);
 
-		// Кнопка обновления
+		// Refresh button.
 		const refreshButton = headerLeftEl.createEl("button", {
 			attr: {
 				"aria-label":
@@ -84,7 +73,7 @@ export class Cardscape extends ItemView {
 			void this.refreshNotes();
 		};
 
-		// Кнопка с папкой и количеством заметок
+		// Folder button with note count.
 		const folderButton = headerLeftEl.createEl("button");
 		folderButton.addClass("pinterest-gallery-button");
 		this.folderInfoButton = folderButton;
@@ -92,7 +81,7 @@ export class Cardscape extends ItemView {
 			this.plugin.openSettings();
 		};
 
-		// Кнопка с тегами (иконка + N тегов), открывает/скрывает панель фильтров ниже
+		// Tags button (icon + count), toggles the tag filter panel.
 		const tagsButton = headerLeftEl.createEl("button", {
 			attr: {
 				"aria-label":
@@ -112,7 +101,7 @@ export class Cardscape extends ItemView {
 			"pinterest-gallery-header-controls",
 		);
 
-		// Кнопка сортировки (вместо старой кнопки "Показать/Скрыть фильтры")
+		// Sort button.
 		const sortButton = controlsEl.createEl("button", {
 			attr: {
 				"aria-label":
@@ -144,7 +133,7 @@ export class Cardscape extends ItemView {
 		const settingsIconSpan = settingsButton.createSpan();
 		setIcon(settingsIconSpan, "settings");
 		settingsButton.onclick = () => {
-			// Открыть вкладку настроек плагина
+			// Open plugin settings tab.
 			this.plugin.openSettings();
 		};
 
@@ -188,8 +177,8 @@ export class Cardscape extends ItemView {
 			if (!column) return;
 			const cardEl = column.createDiv("pinterest-gallery-card");
 
-			// Картинка из первой вложенной картинки заметки (если есть)
-			const imageFile = this.findFirstImageForFile(note.file);
+			// First embedded image from the note, if any.
+			const imageFile = findFirstImageForFile(this.app, note.file);
 			if (imageFile) {
 				const imageWrapper = cardEl.createDiv(
 					"pinterest-gallery-card-image",
@@ -200,17 +189,17 @@ export class Cardscape extends ItemView {
 				imgEl.loading = "lazy";
 			}
 
-			// Заголовок карточки
+			// Card title.
 			const titleEl = cardEl.createDiv("pinterest-gallery-card-title");
 			titleEl.setText(note.title);
 
-			// Описание карточки
+			// Card snippet.
 			const snippetEl = cardEl.createDiv(
 				"pinterest-gallery-card-snippet",
 			);
 			snippetEl.setText(note.snippet);
 
-			// Теги карточки
+			// Card tags.
 			if (note.tags.length) {
 				const tagsRow = cardEl.createDiv(
 					"pinterest-gallery-card-tags",
@@ -223,7 +212,7 @@ export class Cardscape extends ItemView {
 				}
 			}
 
-			// Время создания
+			// Creation time (optional, kept for future use).
 			/* const dateEl = cardEl.createDiv("pinterest-gallery-card-date");
 			const created = window.moment(note.created);
 			dateEl.setText(created.format("YYYY-MM-DD HH:mm:ss")); */
@@ -236,155 +225,6 @@ export class Cardscape extends ItemView {
 		this.renderFooter(notes.length);
 	}
 
-	private async loadNotesFromFolder(): Promise<GalleryNoteCard[]> {
-		const vault = this.app.vault;
-		const folderPath = this.plugin.settings.folderPath?.trim();
-
-		let root: TFolder | null = null;
-		if (folderPath) {
-			const maybeFolder = vault.getAbstractFileByPath(folderPath);
-			if (!maybeFolder) {
-				new Notice(
-					this.currentLang === "ru"
-						? `Папка "${folderPath}" не найдена.`
-						: `Folder "${folderPath}" was not found.`,
-				);
-				return [];
-			}
-			if (!(maybeFolder instanceof TFolder)) {
-				new Notice(
-					this.currentLang === "ru"
-						? `"${folderPath}" — это не папка.`
-						: `"${folderPath}" is not a folder.`,
-				);
-				return [];
-			}
-			root = maybeFolder;
-		} else {
-			root = vault.getRoot();
-		}
-
-		const files: TFile[] = [];
-		this.collectMarkdownFiles(root, files);
-
-		// При очень больших хранилищах ограничиваемся наиболее свежими заметками,
-		// чтобы не блокировать интерфейс. Значение задаётся в настройках плагина.
-		const MAX_NOTES = this.plugin.settings.maxNotes ?? 600;
-		const sortedFiles = files
-			.slice()
-			.sort((a, b) => {
-				const aTime =
-					typeof a.stat.ctime === "number"
-						? a.stat.ctime
-						: a.stat.mtime;
-				const bTime =
-					typeof b.stat.ctime === "number"
-						? b.stat.ctime
-						: b.stat.mtime;
-				return bTime - aTime;
-			})
-			.slice(0, MAX_NOTES);
-
-		const cards: GalleryNoteCard[] = [];
-		for (const file of sortedFiles) {
-			const content = await vault.cachedRead(file);
-			const { title, snippet } = this.extractTitleAndSnippet(
-				file,
-				content,
-			);
-			const tags = this.extractTags(file);
-			const created =
-				typeof file.stat.ctime === "number"
-					? file.stat.ctime
-					: file.stat.mtime;
-			cards.push({ file, title, snippet, tags, created });
-		}
-
-		// Можно сортировать по имени или по дате — пока оставим как есть
-		return cards;
-	}
-
-	private collectMarkdownFiles(folder: TFolder, result: TFile[]): void {
-		for (const child of folder.children) {
-			if (child instanceof TFolder) {
-				this.collectMarkdownFiles(child, result);
-			} else if (child instanceof TFile) {
-				if (child.extension === "md") {
-					result.push(child);
-				}
-			}
-		}
-	}
-
-	private extractTitleAndSnippet(
-		file: TFile,
-		content: string,
-	): { title: string; snippet: string } {
-		const lines = content.replace(/^\uFEFF/, "").split(/\r?\n/);
-		const firstContentLineIdx = this.findContentStartLineIndex(lines);
-
-		let title = file.basename;
-		for (let i = firstContentLineIdx; i < lines.length; i++) {
-			const line = lines[i] ?? "";
-			const trimmed = line.trim();
-			if (trimmed.startsWith("# ")) {
-				title = trimmed.replace(/^#\s+/, "").trim();
-				break;
-			}
-		}
-
-		let snippet = "";
-		for (let i = firstContentLineIdx; i < lines.length; i++) {
-			const line = lines[i] ?? "";
-			const trimmed = line.trim();
-			if (!trimmed) continue;
-			if (trimmed.startsWith("#")) continue;
-			// Пропускаем строки, состоящие только из картинок/встроенных файлов,
-			// чтобы не показывать markdown‑синтаксис вроде ![[image.png]].
-			if (trimmed.startsWith("![[") || trimmed.startsWith("![")) continue;
-			// Пропускаем разделители properties/frontmatter, чтобы в snippet не попадало '---'.
-			if (trimmed === "---") continue;
-			snippet = trimmed;
-			break;
-		}
-
-		if (!snippet) {
-			snippet =
-				this.currentLang === "ru"
-					? "Пустая заметка"
-					: "Empty note";
-		} else if (snippet.length > 280) {
-			snippet = snippet.slice(0, 277) + "...";
-		}
-
-		if (title.length > 80) {
-			title = title.slice(0, 77) + "...";
-		}
-
-		return { title, snippet };
-	}
-
-	/**
-	 * Если заметка начинается с блока properties/frontmatter (YAML между --- ... ---),
-	 * возвращает индекс первой строки после этого блока. Иначе возвращает 0.
-	 */
-	private findContentStartLineIndex(lines: string[]): number {
-		// Пропускаем пустые строки в начале
-		let i = 0;
-		while (i < lines.length && !lines[i]?.trim()) i++;
-
-		if ((lines[i] ?? "").trim() !== "---") return 0;
-
-		// Ищем закрывающий '---'
-		for (let j = i + 1; j < lines.length; j++) {
-			if ((lines[j] ?? "").trim() === "---") {
-				return j + 1;
-			}
-		}
-
-		// Если закрывающего разделителя нет — не считаем это frontmatter.
-		return 0;
-	}
 
 	private renderFooter(visibleCount: number): void {
 		if (!this.gridEl) return;
@@ -417,7 +257,7 @@ export class Cardscape extends ItemView {
 		}
 	}
 
-	// Русская форма слова по числу: 1 заметку, 2‑4 заметки, 5+ заметок
+	// Russian plural forms: 1 note, 2-4 notes, 5+ notes.
 	private getRuPlural(n: number, forms: [string, string, string]): string {
 		const abs = Math.abs(n) % 100;
 		const last = abs % 10;
@@ -427,77 +267,9 @@ export class Cardscape extends ItemView {
 		return forms[2];
 	}
 
-	private extractTags(file: TFile): string[] {
-		const { metadataCache } = this.app;
-		const cache = metadataCache.getFileCache(file);
-
-		const tagSet = new Set<string>();
-
-		// Теги из body (#tag)
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const bodyTags: any[] | undefined = cache?.tags;
-		if (bodyTags) {
-			for (const t of bodyTags) {
-				const raw = typeof t.tag === "string" ? t.tag : "";
-				if (!raw) continue;
-				const norm = raw.replace(/^#/, "").trim().toLowerCase();
-				if (norm) tagSet.add(norm);
-			}
-		}
-
-		// Теги из frontmatter (tags: tag | [tag1, tag2])
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const fm: any | undefined = cache?.frontmatter;
-		if (fm && fm.tags) {
-			const fmTags = Array.isArray(fm.tags) ? fm.tags : [fm.tags];
-			for (const rawTag of fmTags) {
-				if (typeof rawTag !== "string") continue;
-				const norm = rawTag.replace(/^#/, "").trim().toLowerCase();
-				if (norm) tagSet.add(norm);
-			}
-		}
-
-		return Array.from(tagSet).sort();
-	}
-
 	private async openNote(file: TFile): Promise<void> {
 		const leaf = this.app.workspace.getLeaf(false);
 		await leaf.openFile(file);
-	}
-
-	private findFirstImageForFile(noteFile: TFile): TFile | null {
-		const { metadataCache } = this.app;
-		const cache = metadataCache.getFileCache(noteFile);
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const embeds: any[] | undefined = cache?.embeds;
-		if (!embeds || !embeds.length) return null;
-
-		const imageExtensions = new Set([
-			"png",
-			"jpg",
-			"jpeg",
-			"gif",
-			"webp",
-			"bmp",
-			"svg",
-		]);
-
-		for (const embed of embeds) {
-			const link: string | undefined = embed.link;
-			if (!link) continue;
-			const target = metadataCache.getFirstLinkpathDest(
-				link,
-				noteFile.path,
-			);
-			if (
-				target instanceof TFile &&
-				imageExtensions.has(target.extension.toLowerCase())
-			) {
-				return target;
-			}
-		}
-
-		return null;
 	}
 
 	private getColumnCount(): number {
@@ -508,12 +280,15 @@ export class Cardscape extends ItemView {
 
 		if (width < 700) return 1;
 		if (width < 1024) return 3;
-		// на больших экранах держим 6 колонок, чтобы сохранить текущий визуальный стиль
-		return 6;
+		return getColumnCountFromWidth(width);
 	}
 
 	private async refreshNotes(): Promise<void> {
-		this.allNotes = await this.loadNotesFromFolder();
+		this.allNotes = await loadNotesFromFolder(
+			this.app,
+			this.plugin.settings,
+			this.currentLang,
+		);
 		this.renderTagFilters();
 		this.updateFolderInfo();
 		this.updateTagsInfo();
@@ -625,7 +400,7 @@ export class Cardscape extends ItemView {
 			this.tagsInfoButton.removeClass("is-active");
 		}
 
-		// Если тегов нет — визуально делаем кнопку "приглушённой"
+		// If no tags are available, dim the button.
 		this.tagsInfoButton.toggleClass("is-disabled", totalCount === 0);
 	}
 
@@ -665,26 +440,7 @@ export class Cardscape extends ItemView {
 	}
 
 	private getFilteredNotes(): GalleryNoteCard[] {
-		let notes: GalleryNoteCard[];
-
-		if (!this.selectedTags.size) {
-			notes = [...this.allNotes];
-		} else {
-			const required = Array.from(this.selectedTags);
-			notes = this.allNotes.filter((note) =>
-				required.every((tag) => note.tags.includes(tag)),
-			);
-		}
-
-		notes.sort((a, b) => {
-			if (this.sortOrder === "new-first") {
-				return b.created - a.created;
-			}
-			// old-first
-			return a.created - b.created;
-		});
-
-		return notes;
+		return getFilteredNotes(this.allNotes, this.selectedTags, this.sortOrder);
 	}
 
 	private renderTagFilters(): void {
@@ -692,15 +448,7 @@ export class Cardscape extends ItemView {
 
 		this.tagFilterContainerEl.empty();
 
-		// Собираем множество всех тегов по всем заметкам
-		const tagSet = new Set<string>();
-		for (const note of this.allNotes) {
-			for (const tag of note.tags) {
-				tagSet.add(tag);
-			}
-		}
-
-		const allTags = Array.from(tagSet).sort();
+		const allTags = collectAvailableTags(this.allNotes);
 		this.allAvailableTags = allTags;
 		this.updateTagsInfo();
 

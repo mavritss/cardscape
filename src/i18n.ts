@@ -1,21 +1,21 @@
 import type { App } from "obsidian";
 
 /**
- * Поддерживаемые языки интерфейса плагина.
+ * Supported plugin UI languages.
  *
- * - "auto" — автоматически подстраиваться под язык Obsidian.
- * - "ru"   — русский.
- * - "en"   — английский.
+ * - "auto" - match Obsidian locale.
+ * - "ru"   - Russian.
+ * - "en"   - English.
  */
 export type UiLanguage = "auto" | "ru" | "en";
 
 export type ResolvedUiLanguage = "ru" | "en";
 
 /**
- * Аккуратно определяем язык интерфейса:
- * 1) Если пользователь явно выбрал язык в настройках — используем его.
- * 2) Иначе смотрим на язык Obsidian (`app.locale`).
- * 3) Всё остальное по умолчанию трактуем как английский.
+ * Resolve effective UI language:
+ * 1) Use explicit user setting, if present.
+ * 2) Otherwise inspect Obsidian locale (`app.locale`).
+ * 3) Fallback to English for everything else.
  */
 export function resolveUiLanguage(
 	app: App,
