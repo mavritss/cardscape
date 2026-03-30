@@ -3,6 +3,10 @@ import type { GalleryPluginSettings } from "../settings";
 import type { ResolvedUiLanguage } from "../i18n";
 import type { GalleryNoteCard } from "./types";
 
+type TagLike = { tag?: unknown };
+type FrontmatterLike = { tags?: unknown };
+type EmbedLike = { link?: unknown };
+
 export async function loadNotesFromFolder(
 	app: App,
 	settings: GalleryPluginSettings,
@@ -140,8 +144,7 @@ function extractTags(app: App, file: TFile): string[] {
 	const tagSet = new Set<string>();
 
 	// Tags from body (#tag)
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const bodyTags: any[] | undefined = cache?.tags;
+	const bodyTags = cache?.tags as TagLike[] | undefined;
 	if (bodyTags) {
 		for (const t of bodyTags) {
 			const raw = typeof t.tag === "string" ? t.tag : "";
@@ -152,8 +155,7 @@ function extractTags(app: App, file: TFile): string[] {
 	}
 
 	// Tags from frontmatter (tags: tag | [tag1, tag2])
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const frontmatter: any | undefined = cache?.frontmatter;
+	const frontmatter = cache?.frontmatter as FrontmatterLike | undefined;
 	if (frontmatter && frontmatter.tags) {
 		const fmTags = Array.isArray(frontmatter.tags)
 			? frontmatter.tags
@@ -170,8 +172,7 @@ function extractTags(app: App, file: TFile): string[] {
 
 export function findFirstImageForFile(app: App, noteFile: TFile): TFile | null {
 	const cache = app.metadataCache.getFileCache(noteFile);
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const embeds: any[] | undefined = cache?.embeds;
+	const embeds = cache?.embeds as EmbedLike[] | undefined;
 	if (!embeds || !embeds.length) return null;
 
 	const imageExtensions = new Set([
@@ -185,7 +186,7 @@ export function findFirstImageForFile(app: App, noteFile: TFile): TFile | null {
 	]);
 
 	for (const embed of embeds) {
-		const link: string | undefined = embed.link;
+		const link = typeof embed.link === "string" ? embed.link : undefined;
 		if (!link) continue;
 		const target = app.metadataCache.getFirstLinkpathDest(link, noteFile.path);
 		if (

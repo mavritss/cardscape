@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type MyPlugin from "./main";
-import type { UiLanguage } from "./i18n";
+import { resolveUiLanguage, type ResolvedUiLanguage, type UiLanguage } from "./i18n";
 
 export interface GalleryPluginSettings {
 	folderPath: string;
@@ -35,9 +35,9 @@ export class GallerySettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl("h2", {
-			text: "Cardscape",
-		});
+		new Setting(containerEl)
+			.setName(lang === "ru" ? "Основные настройки" : "General settings")
+			.setHeading();
 
 		// Setting: target folder for notes.
 		new Setting(containerEl)
@@ -125,9 +125,7 @@ export class GallerySettingTab extends PluginSettingTab {
 	/**
 	 * Helper: returns the effective UI language for settings screen.
 	 */
-	private getCurrentLanguage() {
-		// Lazy import to avoid unnecessary dependencies in this module.
-		const { resolveUiLanguage } = require("./i18n") as typeof import("./i18n");
+	private getCurrentLanguage(): ResolvedUiLanguage {
 		return resolveUiLanguage(this.app, this.plugin.settings.language);
 	}
 }

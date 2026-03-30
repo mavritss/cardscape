@@ -27,9 +27,8 @@ export function resolveUiLanguage(
 		return choice;
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const anyApp = app as any;
-	const rawLocale: unknown = anyApp?.locale;
+	const appWithLocale = app as App & { locale?: unknown };
+	const rawLocale: unknown = appWithLocale.locale;
 
 	if (typeof rawLocale === "string") {
 		const lowered = rawLocale.toLowerCase();

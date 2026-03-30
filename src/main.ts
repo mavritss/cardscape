@@ -7,7 +7,14 @@ import {
 import { GALLERY_VIEW_TYPE, Cardscape } from "./galleryView";
 import { resolveUiLanguage } from "./i18n";
 
-export default class MyPlugin extends Plugin {
+type AppWithSettings = Plugin["app"] & {
+	setting?: {
+		open: () => void;
+		openTabById: (id: string) => void;
+	};
+};
+
+export default class CardscapePlugin extends Plugin {
 	settings: GalleryPluginSettings;
 
 	async onload() {
@@ -32,14 +39,16 @@ export default class MyPlugin extends Plugin {
 			"layout-grid",
 			ribbonTitle,
 			() => {
-				this.activateGalleryView();
+				void this.activateGalleryView();
 			},
 		);
 
 		this.addCommand({
 			id: "open-pinterest-gallery",
 			name: commandName,
-			callback: () => this.activateGalleryView(),
+			callback: () => {
+				void this.activateGalleryView();
+			},
 		});
 
 		this.addSettingTab(new GallerySettingTab(this.app, this));
@@ -76,17 +85,14 @@ export default class MyPlugin extends Plugin {
 			});
 		}
 
-		workspace.revealLeaf(leaf);
+		await workspace.revealLeaf(leaf);
 	}
 
 	openSettings() {
-		// In some Obsidian type versions `setting` is not declared.
-		// Cast to any to keep compatibility and avoid TS errors.
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const anyApp = this.app as any;
-		if (anyApp.setting) {
-			anyApp.setting.open();
-			anyApp.setting.openTabById(this.manifest.id);
+		const appWithSettings = this.app as AppWithSettings;
+		if (appWithSettings.setting) {
+			appWithSettings.setting.open();
+			appWithSettings.setting.openTabById(this.manifest.id);
 		}
 	}
 }
