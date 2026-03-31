@@ -3,7 +3,7 @@
 	"name": "Cardscape",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Turns your chosen folder into a Pinterest-like notes feed",
+	"description": "Turns your chosen folder into a Pinterest-like notes feed.",
 	"author": "tema mavrits",
 	"fundingUrl": "https://ko-fi.com/mavrits",
 	"isDesktopOnly": false
