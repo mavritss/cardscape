@@ -1,3 +1,5 @@
+![Cardscape example view screenshot](/image.png)
+
 # Cardscape
 
 Cardscape is an Obsidian community plugin that turns notes from a selected folder into a Pinterest-style card feed.  
