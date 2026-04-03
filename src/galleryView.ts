@@ -153,7 +153,7 @@ export class Cardscape extends ItemView {
 		await this.refreshNotes();
 	}
 
-	async renderNotes(): Promise<void> {
+	renderNotes(): void {
 		if (!this.gridEl) return;
 
 		this.gridEl.empty();
@@ -299,7 +299,7 @@ export class Cardscape extends ItemView {
 		this.renderTagFilters();
 		this.updateFolderInfo();
 		this.updateTagsInfo();
-		await this.renderNotes();
+		this.renderNotes();
 	}
 
 	private updateFolderInfo(): void {
@@ -501,7 +501,7 @@ export class Cardscape extends ItemView {
 		}
 	}
 
-	async onClose(): Promise<void> {
+	onClose(): Promise<void> {
 		this.gridEl = null;
 		this.tagFilterContainerEl = null;
 		this.allNotes = [];
@@ -510,6 +510,7 @@ export class Cardscape extends ItemView {
 		this.tagsInfoButton = null;
 		this.sortOrderButton = null;
 		this.allAvailableTags = [];
+		return Promise.resolve();
 	}
 }
 
