@@ -5,6 +5,8 @@ import { resolveUiLanguage, type ResolvedUiLanguage, type UiLanguage } from "./i
 export interface GalleryPluginSettings {
 	folderPath: string;
 	maxNotes: number;
+	useCardIndex: boolean;
+	cardIndexPath: string;
 	/**
 	 * Preferred plugin UI language.
 	 * Saved in settings and used for labels/tooltips.
@@ -15,6 +17,8 @@ export interface GalleryPluginSettings {
 export const DEFAULT_SETTINGS: GalleryPluginSettings = {
 	folderPath: "",
 	maxNotes: 600,
+	useCardIndex: true,
+	cardIndexPath: ".ai/cardscape-index.json",
 	language: "auto",
 };
 
@@ -59,6 +63,49 @@ export class GallerySettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.folderPath)
 					.onChange(async (value) => {
 						this.plugin.settings.folderPath = value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName(
+				lang === "ru"
+					? "Использовать индекс карточек"
+					: "Use card index",
+			)
+			.setDesc(
+				lang === "ru"
+					? "Если включено, галерея сначала читает быстрый индекс карточек. Если индекс не найден, используется обычное чтение заметок."
+					: "When enabled, the gallery reads the fast card index first. If the index is missing, it falls back to reading notes.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.useCardIndex ?? true)
+					.onChange(async (value) => {
+						this.plugin.settings.useCardIndex = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName(
+				lang === "ru" ? "Путь к индексу карточек" : "Card index path",
+			)
+			.setDesc(
+				lang === "ru"
+					? 'Путь внутри vault, например ".ai/cardscape-index.json".'
+					: 'Path inside the vault, for example ".ai/cardscape-index.json".',
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder(".ai/cardscape-index.json")
+					.setValue(
+						this.plugin.settings.cardIndexPath ??
+							".ai/cardscape-index.json",
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.cardIndexPath =
+							value.trim() || ".ai/cardscape-index.json";
 						await this.plugin.saveSettings();
 					}),
 			);

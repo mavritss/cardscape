@@ -1,4 +1,4 @@
-import { Notice, TFile, TFolder, type App } from "obsidian";
+import { Notice, TFile, TFolder, normalizePath, type App } from "obsidian";
 import type { GalleryPluginSettings } from "../settings";
 import type { ResolvedUiLanguage } from "../i18n";
 import type { GalleryNoteCard } from "./types";
@@ -6,12 +6,35 @@ import type { GalleryNoteCard } from "./types";
 type TagLike = { tag?: unknown };
 type FrontmatterLike = { tags?: unknown };
 type EmbedLike = { link?: unknown };
+type CardIndexEntry = {
+	path?: unknown;
+	title?: unknown;
+	summary?: unknown;
+	tags?: unknown;
+	created?: unknown;
+	updated?: unknown;
+	modified?: unknown;
+	preview_image?: unknown;
+};
+
+type CardIndex = {
+	cards?: unknown;
+};
 
 export async function loadNotesFromFolder(
 	app: App,
 	settings: GalleryPluginSettings,
 	currentLang: ResolvedUiLanguage,
 ): Promise<GalleryNoteCard[]> {
+	if (settings.useCardIndex ?? true) {
+		const indexedCards = await loadNotesFromCardIndex(
+			app,
+			settings,
+			currentLang,
+		);
+		if (indexedCards) return indexedCards;
+	}
+
 	const vault = app.vault;
 	const folderPath = settings.folderPath?.trim();
 
@@ -59,10 +82,88 @@ export async function loadNotesFromFolder(
 		const { title, snippet } = extractTitleAndSnippet(file, content, currentLang);
 		const tags = extractTags(app, file);
 		const created = typeof file.stat.ctime === "number" ? file.stat.ctime : file.stat.mtime;
-		cards.push({ file, title, snippet, tags, created });
+		cards.push({ file, title, snippet, tags, created, source: "markdown" });
 	}
 
 	return cards;
+}
+
+async function loadNotesFromCardIndex(
+	app: App,
+	settings: GalleryPluginSettings,
+	currentLang: ResolvedUiLanguage,
+): Promise<GalleryNoteCard[] | null> {
+	const vault = app.vault;
+	const indexPath = normalizePath(
+		settings.cardIndexPath?.trim() || ".ai/cardscape-index.json",
+	);
+
+	try {
+		const raw = await vault.adapter.read(indexPath);
+		const parsed = JSON.parse(raw) as CardIndex;
+		if (!Array.isArray(parsed.cards)) return null;
+
+		const folderPath = normalizePath(settings.folderPath?.trim() ?? "");
+		const cards: GalleryNoteCard[] = [];
+
+		for (const rawCard of parsed.cards as CardIndexEntry[]) {
+			if (!rawCard || typeof rawCard.path !== "string") continue;
+			const notePath = normalizePath(rawCard.path);
+			if (folderPath && !notePath.startsWith(`${folderPath}/`)) continue;
+
+			const maybeFile = vault.getAbstractFileByPath(notePath);
+			if (!(maybeFile instanceof TFile)) continue;
+
+			const title =
+				typeof rawCard.title === "string" && rawCard.title.trim()
+					? rawCard.title.trim()
+					: maybeFile.basename;
+			const snippet =
+				typeof rawCard.summary === "string" && rawCard.summary.trim()
+					? rawCard.summary.trim()
+					: currentLang === "ru"
+						? "Пустая заметка"
+						: "Empty note";
+			const tags = Array.isArray(rawCard.tags)
+				? rawCard.tags
+						.filter((tag): tag is string => typeof tag === "string")
+						.map((tag) => tag.replace(/^#/, "").trim())
+						.filter(Boolean)
+				: [];
+			const created = getCardTimestamp(rawCard, maybeFile);
+			const previewImagePath =
+				typeof rawCard.preview_image === "string"
+					? rawCard.preview_image
+					: undefined;
+
+			cards.push({
+				file: maybeFile,
+				title,
+				snippet,
+				tags: Array.from(new Set(tags)).sort(),
+				created,
+				previewImagePath,
+				source: "index",
+			});
+		}
+
+		const maxNotes = settings.maxNotes ?? 600;
+		return cards
+			.sort((a, b) => b.created - a.created)
+			.slice(0, maxNotes);
+	} catch {
+		return null;
+	}
+}
+
+function getCardTimestamp(card: CardIndexEntry, file: TFile): number {
+	for (const key of ["created", "updated", "modified"] as const) {
+		const raw = card[key];
+		if (typeof raw !== "string") continue;
+		const parsed = Date.parse(raw);
+		if (Number.isFinite(parsed)) return parsed;
+	}
+	return typeof file.stat.ctime === "number" ? file.stat.ctime : file.stat.mtime;
 }
 
 function collectMarkdownFiles(folder: TFolder, result: TFile[]): void {
@@ -149,7 +250,7 @@ function extractTags(app: App, file: TFile): string[] {
 		for (const t of bodyTags) {
 			const raw = typeof t.tag === "string" ? t.tag : "";
 			if (!raw) continue;
-			const norm = raw.replace(/^#/, "").trim().toLowerCase();
+			const norm = raw.replace(/^#/, "").trim();
 			if (norm) tagSet.add(norm);
 		}
 	}
@@ -162,7 +263,7 @@ function extractTags(app: App, file: TFile): string[] {
 			: [frontmatter.tags];
 		for (const rawTag of fmTags) {
 			if (typeof rawTag !== "string") continue;
-			const norm = rawTag.replace(/^#/, "").trim().toLowerCase();
+			const norm = rawTag.replace(/^#/, "").trim();
 			if (norm) tagSet.add(norm);
 		}
 	}
@@ -198,4 +299,15 @@ export function findFirstImageForFile(app: App, noteFile: TFile): TFile | null {
 	}
 
 	return null;
+}
+
+export function findPreviewImageForCard(app: App, note: GalleryNoteCard): TFile | null {
+	if (note.previewImagePath) {
+		const target = app.metadataCache.getFirstLinkpathDest(
+			note.previewImagePath,
+			note.file.path,
+		);
+		if (target instanceof TFile) return target;
+	}
+	return findFirstImageForFile(app, note.file);
 }

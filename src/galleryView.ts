@@ -2,8 +2,12 @@ import { ItemView, TFile, WorkspaceLeaf, setIcon } from "obsidian";
 import type MyPlugin from "./main";
 import { resolveUiLanguage, type ResolvedUiLanguage } from "./i18n";
 import type { GalleryNoteCard, GallerySortOrder } from "./gallery/types";
-import { loadNotesFromFolder, findFirstImageForFile } from "./gallery/notes";
-import { collectAvailableTags, getFilteredNotes } from "./gallery/filters";
+import { loadNotesFromFolder, findPreviewImageForCard } from "./gallery/notes";
+import {
+	collectAvailableTags,
+	collectTagGroups,
+	getFilteredNotes,
+} from "./gallery/filters";
 import { getColumnCountFromWidth } from "./gallery/layout";
 
 export const GALLERY_VIEW_TYPE = "pinterest-cards-gallery-view";
@@ -20,6 +24,19 @@ export class Cardscape extends ItemView {
 	sortOrderButton: HTMLButtonElement | null = null;
 	private allAvailableTags: string[] = [];
 	private currentLang: ResolvedUiLanguage = "ru";
+	private visibleNotes: GalleryNoteCard[] = [];
+	private columns: HTMLElement[] = [];
+	private columnHeights: number[] = [];
+	private renderedCount = 0;
+	private currentColumnCount = 0;
+	private footerEl: HTMLElement | null = null;
+	private resizeObserver: ResizeObserver | null = null;
+	private resizeTimer: number | null = null;
+	private readonly pageSize = 48;
+	private readonly scrollLoadOffset = 900;
+	private onGridScroll = (): void => {
+		this.loadMoreIfNeeded();
+	};
 
 	constructor(leaf: WorkspaceLeaf, plugin: MyPlugin) {
 		super(leaf);
@@ -149,16 +166,26 @@ export class Cardscape extends ItemView {
 		this.tagFilterContainerEl.addClass("is-collapsed");
 
 		this.gridEl = containerEl.createDiv("pinterest-gallery-grid");
+		this.gridEl.addEventListener("scroll", this.onGridScroll);
+		this.resizeObserver = new ResizeObserver(() => {
+			this.handleGridResize();
+		});
+		this.resizeObserver.observe(this.gridEl);
 
 		await this.refreshNotes();
 	}
 
-	renderNotes(): void {
+	renderNotes(initialCount = this.pageSize): void {
 		if (!this.gridEl) return;
 
 		this.gridEl.empty();
+		this.columns = [];
+		this.columnHeights = [];
+		this.renderedCount = 0;
+		this.footerEl = null;
 
 		const notes = this.getFilteredNotes();
+		this.visibleNotes = notes;
 
 		if (!notes.length) {
 			const emptyEl = this.gridEl.createDiv("pinterest-gallery-empty");
@@ -173,63 +200,138 @@ export class Cardscape extends ItemView {
 		const columnsWrap = this.gridEl.createDiv("pinterest-gallery-columns");
 
 		const columnCount = this.getColumnCount();
-		const columns: HTMLElement[] = [];
+		this.currentColumnCount = columnCount;
 		for (let i = 0; i < columnCount; i++) {
 			const col = columnsWrap.createDiv("pinterest-gallery-column");
-			columns.push(col);
+			this.columns.push(col);
+			this.columnHeights.push(0);
 		}
 
-		notes.forEach((note, index) => {
-			const column = columns[index % columnCount];
-			if (!column) return;
-			const cardEl = column.createDiv("pinterest-gallery-card");
+		this.appendNotesUntil(Math.min(notes.length, initialCount));
+		this.fillViewportIfNeeded();
+	}
 
-			// First embedded image from the note, if any.
-			const imageFile = findFirstImageForFile(this.app, note.file);
-			if (imageFile) {
-				const imageWrapper = cardEl.createDiv(
-					"pinterest-gallery-card-image",
-				);
-				const imgEl = imageWrapper.createEl("img");
-				imgEl.src = this.app.vault.getResourcePath(imageFile);
-				imgEl.alt = note.title;
-				imgEl.loading = "lazy";
-			}
+	private appendNotesUntil(targetCount: number): void {
+		if (!this.gridEl || !this.columns.length) return;
 
-			// Card title.
-			const titleEl = cardEl.createDiv("pinterest-gallery-card-title");
-			titleEl.setText(note.title);
+		const maxCount = Math.min(targetCount, this.visibleNotes.length);
+		while (this.renderedCount < maxCount) {
+			const note = this.visibleNotes[this.renderedCount];
+			if (!note) break;
 
-			// Card snippet.
-			const snippetEl = cardEl.createDiv(
-				"pinterest-gallery-card-snippet",
+			const columnIndex = this.getShortestColumnIndex();
+			const column = this.columns[columnIndex];
+			if (!column) break;
+
+			this.renderCard(note, column);
+			this.columnHeights[columnIndex] =
+				(this.columnHeights[columnIndex] ?? 0) +
+				this.estimateCardHeight(note);
+			this.renderedCount += 1;
+		}
+
+		this.updateFooter();
+	}
+
+	private renderCard(note: GalleryNoteCard, column: HTMLElement): void {
+		const cardEl = column.createDiv("pinterest-gallery-card");
+
+		const imageFile = findPreviewImageForCard(this.app, note);
+		if (imageFile) {
+			const imageWrapper = cardEl.createDiv(
+				"pinterest-gallery-card-image",
 			);
-			snippetEl.setText(note.snippet);
+			const imgEl = imageWrapper.createEl("img");
+			imgEl.src = this.app.vault.getResourcePath(imageFile);
+			imgEl.alt = note.title;
+			imgEl.loading = "lazy";
+		}
 
-			// Card tags.
-			if (note.tags.length) {
-				const tagsRow = cardEl.createDiv(
-					"pinterest-gallery-card-tags",
+		const titleEl = cardEl.createDiv("pinterest-gallery-card-title");
+		titleEl.setText(note.title);
+
+		const snippetEl = cardEl.createDiv("pinterest-gallery-card-snippet");
+		snippetEl.setText(note.snippet);
+
+		if (note.tags.length) {
+			const tagsRow = cardEl.createDiv("pinterest-gallery-card-tags");
+			for (const tag of groupCardTags(note.tags)) {
+				const tagEl = tagsRow.createSpan(
+					"pinterest-gallery-card-tag",
 				);
-				for (const tag of note.tags) {
-					const tagEl = tagsRow.createSpan(
-						"pinterest-gallery-card-tag",
-					);
-					tagEl.setText(`#${tag}`);
+				if (tag.children.length) {
+					tagEl.setText(`#${tag.root}: ${tag.children.join(", ")}`);
+				} else {
+					tagEl.setText(`#${tag.root}`);
 				}
 			}
+		}
 
-			// Creation time (optional, kept for future use).
-			/* const dateEl = cardEl.createDiv("pinterest-gallery-card-date");
-			const created = window.moment(note.created);
-			dateEl.setText(created.format("YYYY-MM-DD HH:mm:ss")); */
+		cardEl.onclick = () => {
+			void this.openNote(note.file);
+		};
+	}
 
-			cardEl.onclick = () => {
-				void this.openNote(note.file);
-			};
-		});
+	private estimateCardHeight(note: GalleryNoteCard): number {
+		const titleLines = Math.ceil(note.title.length / 24);
+		const snippetLines = Math.ceil(note.snippet.length / 42);
+		const tagRows = Math.ceil(Math.max(note.tags.length, 1) / 3);
+		const imageHeight = note.previewImagePath ? 280 : 0;
+		return 110 + titleLines * 24 + snippetLines * 19 + tagRows * 28 + imageHeight;
+	}
 
-		this.renderFooter(notes.length);
+	private getShortestColumnIndex(): number {
+		let shortestIndex = 0;
+		let shortestHeight = Number.POSITIVE_INFINITY;
+		for (let i = 0; i < this.columnHeights.length; i++) {
+			const height = this.columnHeights[i] ?? 0;
+			if (height < shortestHeight) {
+				shortestHeight = height;
+				shortestIndex = i;
+			}
+		}
+		return shortestIndex;
+	}
+
+	private loadMoreIfNeeded(): void {
+		if (!this.gridEl) return;
+		if (this.renderedCount >= this.visibleNotes.length) return;
+
+		const distanceToBottom =
+			this.gridEl.scrollHeight -
+			this.gridEl.scrollTop -
+			this.gridEl.clientHeight;
+		if (distanceToBottom <= this.scrollLoadOffset) {
+			this.appendNotesUntil(this.renderedCount + this.pageSize);
+			this.fillViewportIfNeeded();
+		}
+	}
+
+	private fillViewportIfNeeded(): void {
+		if (!this.gridEl) return;
+
+		let guard = 0;
+		while (
+			this.renderedCount < this.visibleNotes.length &&
+			this.gridEl.scrollHeight <= this.gridEl.clientHeight + 200 &&
+			guard < 6
+		) {
+			this.appendNotesUntil(this.renderedCount + this.pageSize);
+			guard += 1;
+		}
+	}
+
+	private updateFooter(): void {
+		if (!this.gridEl) return;
+
+		if (this.footerEl) {
+			this.footerEl.remove();
+			this.footerEl = null;
+		}
+
+		if (this.renderedCount >= this.visibleNotes.length) {
+			this.renderFooter(this.visibleNotes.length);
+		}
 	}
 
 
@@ -237,6 +339,7 @@ export class Cardscape extends ItemView {
 		if (!this.gridEl) return;
 
 		const footerEl = this.gridEl.createDiv("pinterest-gallery-footer");
+		this.footerEl = footerEl;
 		const footerInner = footerEl.createDiv("pinterest-gallery-footer-inner");
 
 		const folderPathRaw = this.plugin.settings.folderPath?.trim() ?? "";
@@ -285,9 +388,30 @@ export class Cardscape extends ItemView {
 			this.containerEl?.clientWidth ??
 			window.innerWidth;
 
-		if (width < 700) return 1;
-		if (width < 1024) return 3;
 		return getColumnCountFromWidth(width);
+	}
+
+	private handleGridResize(): void {
+		if (!this.gridEl) return;
+		if (this.resizeTimer !== null) {
+			window.clearTimeout(this.resizeTimer);
+		}
+
+		this.resizeTimer = window.setTimeout(() => {
+			this.resizeTimer = null;
+			const nextColumnCount = this.getColumnCount();
+			if (nextColumnCount === this.currentColumnCount) return;
+
+			const targetCount = Math.max(this.renderedCount, this.pageSize);
+			const previousScrollTop = this.gridEl?.scrollTop ?? 0;
+			this.renderNotes(targetCount);
+			if (this.gridEl) {
+				this.gridEl.scrollTop = Math.min(
+					previousScrollTop,
+					this.gridEl.scrollHeight,
+				);
+			}
+		}, 120);
 	}
 
 	private async refreshNotes(): Promise<void> {
@@ -456,6 +580,7 @@ export class Cardscape extends ItemView {
 		this.tagFilterContainerEl.empty();
 
 		const allTags = collectAvailableTags(this.allNotes);
+		const tagGroups = collectTagGroups(this.allNotes);
 		this.allAvailableTags = allTags;
 		this.updateTagsInfo();
 
@@ -472,15 +597,27 @@ export class Cardscape extends ItemView {
 			return;
 		}
 
+		const selectedRootTags = tagGroups.filter((group) =>
+			this.selectedTags.has(group.tag),
+		);
+
 		const tagsRow = this.tagFilterContainerEl.createDiv(
 			"pinterest-gallery-tags-row",
 		);
 
-		for (const tag of allTags) {
-			const chip = tagsRow.createEl("button", {
-				text: `#${tag}`,
-			});
+		for (const group of tagGroups) {
+			const tag = group.tag;
+			const chip = tagsRow.createEl("button");
 			chip.addClass("pinterest-gallery-tag-chip");
+			chip.addClass("is-root-tag");
+			chip.createSpan("pinterest-gallery-tag-chip-label").setText(
+				`#${tag}`,
+			);
+			if (group.children.length) {
+				chip.createSpan("pinterest-gallery-tag-child-count").setText(
+					String(group.children.length),
+				);
+			}
 			if (this.selectedTags.has(tag)) {
 				chip.addClass("is-selected");
 			}
@@ -496,15 +633,76 @@ export class Cardscape extends ItemView {
 				}
 
 				this.updateTagsInfo();
+				this.renderTagFilters();
 				void this.renderNotes();
 			};
+		}
+
+		for (const group of selectedRootTags) {
+			if (!group.children.length) continue;
+
+			const childBlock = this.tagFilterContainerEl.createDiv(
+				"pinterest-gallery-tag-children-block",
+			);
+
+			const childTitle = childBlock.createDiv(
+				"pinterest-gallery-tag-children-title",
+			);
+			childTitle.setText(`#${group.tag}`);
+
+			const childRow = childBlock.createDiv(
+				"pinterest-gallery-tags-row",
+			);
+
+			for (const childTag of group.children) {
+				const childLabel = childTag.slice(group.tag.length + 1);
+				const childChip = childRow.createEl("button", {
+					text: `#${childLabel}`,
+				});
+				childChip.addClass("pinterest-gallery-tag-chip");
+				childChip.addClass("is-child-tag");
+				if (this.selectedTags.has(childTag)) {
+					childChip.addClass("is-selected");
+				}
+
+				childChip.onclick = (evt) => {
+					evt.preventDefault();
+					if (this.selectedTags.has(childTag)) {
+						this.selectedTags.delete(childTag);
+						childChip.removeClass("is-selected");
+					} else {
+						this.selectedTags.add(childTag);
+						childChip.addClass("is-selected");
+					}
+
+					this.updateTagsInfo();
+					void this.renderNotes();
+				};
+			}
 		}
 	}
 
 	onClose(): Promise<void> {
+		if (this.gridEl) {
+			this.gridEl.removeEventListener("scroll", this.onGridScroll);
+		}
+		if (this.resizeObserver) {
+			this.resizeObserver.disconnect();
+			this.resizeObserver = null;
+		}
+		if (this.resizeTimer !== null) {
+			window.clearTimeout(this.resizeTimer);
+			this.resizeTimer = null;
+		}
 		this.gridEl = null;
 		this.tagFilterContainerEl = null;
 		this.allNotes = [];
+		this.visibleNotes = [];
+		this.columns = [];
+		this.columnHeights = [];
+		this.renderedCount = 0;
+		this.currentColumnCount = 0;
+		this.footerEl = null;
 		this.selectedTags.clear();
 		this.folderInfoButton = null;
 		this.tagsInfoButton = null;
@@ -512,6 +710,32 @@ export class Cardscape extends ItemView {
 		this.allAvailableTags = [];
 		return Promise.resolve();
 	}
+}
+
+function groupCardTags(
+	tags: string[],
+): Array<{ root: string; children: string[] }> {
+	const groups = new Map<string, Set<string>>();
+
+	for (const tag of tags) {
+		const [root, ...rest] = tag.split("/");
+		if (!root) continue;
+		if (!groups.has(root)) {
+			groups.set(root, new Set<string>());
+		}
+		if (rest.length) {
+			groups.get(root)?.add(rest.join("/"));
+		}
+	}
+
+	return Array.from(groups.entries())
+		.map(([root, children]) => ({
+			root,
+			children: Array.from(children).sort((a, b) =>
+				a.localeCompare(b, "ru"),
+			),
+		}))
+		.sort((a, b) => a.root.localeCompare(b.root, "ru"));
 }
 
 

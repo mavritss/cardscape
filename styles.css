@@ -163,7 +163,7 @@ Pinterest-like gallery card layout
 
 .pinterest-gallery-grid {
 	/* Container for masonry columns with cards */
-	padding: 1.5rem 2rem;
+	padding: 1.5rem clamp(0.75rem, 2vw, 2rem);
 	width: 100%;
 	flex: 1;
 	overflow: auto;
@@ -178,12 +178,13 @@ Pinterest-like gallery card layout
 .pinterest-gallery-columns {
 	display: flex;
 	align-items: flex-start;
-	gap: 1.2rem;
+	gap: clamp(0.75rem, 1.3vw, 1.2rem);
 	width: 100%;
 }
 
 .pinterest-gallery-column {
 	flex: 1 1 0;
+	min-width: 0;
 	display: flex;
 	flex-direction: column;
 }
@@ -219,7 +220,8 @@ Pinterest-like gallery card layout
 	margin-bottom: 0.55rem;
     line-height: 1.1;
 	font-size: 1.2rem;
-    letter-spacing: -0.035em;
+	letter-spacing: 0;
+	overflow-wrap: anywhere;
 }
 
 .pinterest-gallery-card-image {
@@ -241,6 +243,7 @@ Pinterest-like gallery card layout
 	line-height: 1.4;
 	white-space: pre-line;
 	margin-bottom: 0.4rem;
+	overflow-wrap: anywhere;
 }
 
 .pinterest-gallery-card-tags {
@@ -256,6 +259,8 @@ Pinterest-like gallery card layout
 	border-radius: 999px;
 	background-color: color-mix(in srgb, var(--link-color) 10%, var(--color-base-10));
 	color: var(--link-color);
+	max-width: 100%;
+	overflow-wrap: anywhere;
 }
 
 .pinterest-gallery-empty {
@@ -286,7 +291,25 @@ Pinterest-like gallery card layout
 	gap: 0.25rem;
 }
 
+.pinterest-gallery-tag-children-block {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+	padding-top: 0.25rem;
+	border-top: 1px solid color-mix(in srgb, var(--link-color) 18%, transparent);
+}
+
+.pinterest-gallery-tag-children-title {
+	font-size: 0.72rem;
+	font-weight: 600;
+	color: var(--text-muted);
+	padding: 0 0.25rem;
+}
+
 .pinterest-gallery-tag-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
 	border: solid 1px transparent;
 	border-radius: 0.8rem;
 	background-color: var(--background-secondary);
@@ -297,7 +320,31 @@ Pinterest-like gallery card layout
 	transition:
 		background-color 120ms ease,
 		color 120ms ease,
-		border-color 120ms ease;
+	border-color 120ms ease;
+}
+
+.pinterest-gallery-tag-child-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.25rem;
+	height: 1.25rem;
+	padding: 0 0.3rem;
+	border-radius: 999px;
+	font-size: 0.72rem;
+	line-height: 1;
+	background-color: color-mix(in srgb, var(--link-color) 14%, var(--background-primary));
+	color: var(--text-muted);
+}
+
+.pinterest-gallery-tag-chip.is-root-tag {
+	font-weight: 600;
+}
+
+.pinterest-gallery-tag-chip.is-child-tag {
+	padding: 0.75rem 0.55rem;
+	font-size: 0.78rem;
+	background-color: color-mix(in srgb, var(--background-secondary) 75%, transparent);
 }
 
 .pinterest-gallery-tag-chip.is-selected {
@@ -343,5 +390,49 @@ Pinterest-like gallery card layout
 		var(--background-secondary) 85%,
 		transparent
 	);
+}
+
+@media (max-width: 850px) {
+	.pinterest-gallery-topbar {
+		padding: 0.7rem;
+	}
+
+	.pinterest-gallery-grid {
+		padding-top: 6.5rem;
+	}
+
+	.pinterest-gallery-card {
+		border-radius: 1rem;
+		padding: 0.8rem;
+	}
+
+	.pinterest-gallery-card-title {
+		font-size: 1.05rem;
+	}
+}
+
+@media (max-width: 520px) {
+	.pinterest-gallery-header {
+		align-items: flex-start;
+	}
+
+	.pinterest-gallery-header-left,
+	.pinterest-gallery-header-controls {
+		gap: 0.25rem;
+		padding: 0.3rem;
+	}
+
+	.pinterest-gallery-button {
+		padding: 0.9rem 0.65rem;
+	}
+
+	.pinterest-gallery-sort-text,
+	.pinterest-gallery-folder-button-separator {
+		display: none;
+	}
+
+	.pinterest-gallery-grid {
+		padding-top: 6.2rem;
+	}
 }
 
