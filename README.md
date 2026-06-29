@@ -20,6 +20,7 @@ The view also supports:
 - sorting by newest/oldest notes
 - fast refresh
 - quick access to plugin settings from the gallery header
+- a command that writes `.ai/index-health.json` and opens `2 – Узлы/Состояние индекса.md` with links to notes that need metadata attention
 
 ## Tech stack
 
@@ -93,4 +94,5 @@ Required files:
   - [ ] Edit tags
   - [ ] Add to favorites
   - [ ] View backlinks/internal links
+- [x] Generate an index-health report for missing tags, unknown tags, empty summaries, broken image embeds, and stale Cardscape cache entries
 - [ ] Ink plugin media preview support

@@ -168,11 +168,47 @@ function getCardTimestamp(card: CardIndexEntry, file: TFile): number {
 function collectMarkdownFiles(folder: TFolder, result: TFile[]): void {
 	for (const child of folder.children) {
 		if (child instanceof TFolder) {
+			if (isServiceFolder(child.path)) continue;
 			collectMarkdownFiles(child, result);
 		} else if (child instanceof TFile && child.extension === "md") {
+			if (shouldSkipMarkdownPath(child.path)) continue;
 			result.push(child);
 		}
 	}
+}
+
+function isServiceFolder(path: string): boolean {
+	const normalized = normalizePath(path);
+	return (
+		normalized === ".ai" ||
+		normalized === ".okf" ||
+		normalized === ".obsidian" ||
+		normalized === ".trash" ||
+		normalized === ".git" ||
+		normalized === ".agents" ||
+		normalized === "node_modules" ||
+		normalized.startsWith(".ai/") ||
+		normalized.startsWith(".okf/") ||
+		normalized.startsWith(".obsidian/") ||
+		normalized.startsWith(".trash/") ||
+		normalized.startsWith(".git/") ||
+		normalized.startsWith(".agents/") ||
+		normalized.startsWith("node_modules/")
+	);
+}
+
+function shouldSkipMarkdownPath(path: string): boolean {
+	const normalized = normalizePath(path);
+	return (
+		normalized === "AGENTS.md" ||
+		normalized === "README.md" ||
+		normalized === "TASK.md" ||
+		normalized === "TRIAGE_PROMPT.md" ||
+		normalized === "index.md" ||
+		normalized === "log.md" ||
+		normalized === "2 – Узлы/Состояние индекса.md" ||
+		normalized.endsWith("/index.md")
+	);
 }
 
 function extractTitleAndSnippet(

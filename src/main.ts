@@ -7,6 +7,7 @@ import {
 import { GALLERY_VIEW_TYPE, Cardscape } from "./galleryView";
 import { resolveUiLanguage } from "./i18n";
 import { CardIndexSynchronizer } from "./gallery/cardIndex";
+import { generateAndOpenIndexHealth } from "./gallery/indexHealth";
 
 type AppWithSettings = Plugin["app"] & {
 	setting?: {
@@ -66,6 +67,17 @@ export default class CardscapePlugin extends Plugin {
 					: "Rebuild Cardscape index",
 			callback: () => {
 				void this.cardIndexSynchronizer?.rebuildAll();
+			},
+		});
+
+		this.addCommand({
+			id: "open-index-health-report",
+			name:
+				lang === "ru"
+					? "Показать заметки, требующие внимания"
+					: "Show notes needing attention",
+			callback: () => {
+				void generateAndOpenIndexHealth(this);
 			},
 		});
 

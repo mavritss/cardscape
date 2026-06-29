@@ -278,6 +278,7 @@ export class CardIndexSynchronizer {
 	private isIndexableMarkdownPath(path: string): boolean {
 		const normalized = normalizePath(path);
 		if (!normalized.toLowerCase().endsWith(".md")) return false;
+		if (isServicePath(normalized)) return false;
 		if (shouldSkip(normalized)) return false;
 		return !normalized.startsWith("4 – Архив/");
 	}
@@ -429,9 +430,23 @@ function shouldSkip(path: string): boolean {
 		path === "AGENTS.md" ||
 		path === "README.md" ||
 		path === "TASK.md" ||
+		path === "TRIAGE_PROMPT.md" ||
 		path === "index.md" ||
 		path === "log.md" ||
+		path === "2 – Узлы/Состояние индекса.md" ||
 		path.endsWith("/index.md")
+	);
+}
+
+function isServicePath(path: string): boolean {
+	return (
+		path.startsWith(".ai/") ||
+		path.startsWith(".okf/") ||
+		path.startsWith(".obsidian/") ||
+		path.startsWith(".trash/") ||
+		path.startsWith(".git/") ||
+		path.startsWith(".agents/") ||
+		path.startsWith("node_modules/")
 	);
 }
 
