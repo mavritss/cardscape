@@ -6,6 +6,7 @@ import {
 } from "./settings";
 import { GALLERY_VIEW_TYPE, Cardscape } from "./galleryView";
 import { resolveUiLanguage } from "./i18n";
+import { CardIndexSynchronizer } from "./gallery/cardIndex";
 
 type AppWithSettings = Plugin["app"] & {
 	setting?: {
@@ -16,6 +17,7 @@ type AppWithSettings = Plugin["app"] & {
 
 export default class CardscapePlugin extends Plugin {
 	settings: GalleryPluginSettings;
+	private cardIndexSynchronizer: CardIndexSynchronizer | null = null;
 
 	async onload() {
 		// Load saved settings or fall back to defaults.
@@ -51,10 +53,27 @@ export default class CardscapePlugin extends Plugin {
 			},
 		});
 
+		this.cardIndexSynchronizer = new CardIndexSynchronizer(this, () => {
+			this.refreshOpenGalleryViews();
+		});
+		this.cardIndexSynchronizer.start();
+
+		this.addCommand({
+			id: "rebuild-cardscape-index",
+			name:
+				lang === "ru"
+					? "Пересобрать индекс Cardscape"
+					: "Rebuild Cardscape index",
+			callback: () => {
+				void this.cardIndexSynchronizer?.rebuildAll();
+			},
+		});
+
 		this.addSettingTab(new GallerySettingTab(this.app, this));
 	}
 
 	onunload() {
+		this.cardIndexSynchronizer = null;
 		this.app.workspace
 			.getLeavesOfType(GALLERY_VIEW_TYPE)
 			.forEach((leaf) => leaf.detach());
@@ -93,6 +112,15 @@ export default class CardscapePlugin extends Plugin {
 		if (appWithSettings.setting) {
 			appWithSettings.setting.open();
 			appWithSettings.setting.openTabById(this.manifest.id);
+		}
+	}
+
+	private refreshOpenGalleryViews() {
+		for (const leaf of this.app.workspace.getLeavesOfType(GALLERY_VIEW_TYPE)) {
+			const view = leaf.view;
+			if (view instanceof Cardscape) {
+				void view.refreshNotes();
+			}
 		}
 	}
 }

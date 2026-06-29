@@ -3,7 +3,6 @@ import type { GalleryPluginSettings } from "../settings";
 import type { ResolvedUiLanguage } from "../i18n";
 import type { GalleryNoteCard } from "./types";
 
-type TagLike = { tag?: unknown };
 type FrontmatterLike = { tags?: unknown };
 type EmbedLike = { link?: unknown };
 type CardIndexEntry = {
@@ -243,19 +242,6 @@ function findContentStartLineIndex(lines: string[]): number {
 function extractTags(app: App, file: TFile): string[] {
 	const cache = app.metadataCache.getFileCache(file);
 	const tagSet = new Set<string>();
-
-	// Tags from body (#tag)
-	const bodyTags = cache?.tags as TagLike[] | undefined;
-	if (bodyTags) {
-		for (const t of bodyTags) {
-			const raw = typeof t.tag === "string" ? t.tag : "";
-			if (!raw) continue;
-			const norm = raw.replace(/^#/, "").trim();
-			if (norm) tagSet.add(norm);
-		}
-	}
-
-	// Tags from frontmatter (tags: tag | [tag1, tag2])
 	const frontmatter = cache?.frontmatter as FrontmatterLike | undefined;
 	if (frontmatter && frontmatter.tags) {
 		const fmTags = Array.isArray(frontmatter.tags)

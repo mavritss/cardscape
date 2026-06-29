@@ -414,7 +414,7 @@ export class Cardscape extends ItemView {
 		}, 120);
 	}
 
-	private async refreshNotes(): Promise<void> {
+	async refreshNotes(): Promise<void> {
 		this.allNotes = await loadNotesFromFolder(
 			this.app,
 			this.plugin.settings,
