@@ -11,8 +11,6 @@ type CardIndexEntry = {
 	summary?: unknown;
 	tags?: unknown;
 	created?: unknown;
-	updated?: unknown;
-	modified?: unknown;
 	preview_image?: unknown;
 };
 
@@ -68,11 +66,7 @@ export async function loadNotesFromFolder(
 	const maxNotes = settings.maxNotes ?? 600;
 	const sortedFiles = files
 		.slice()
-		.sort((a, b) => {
-			const aTime = typeof a.stat.ctime === "number" ? a.stat.ctime : a.stat.mtime;
-			const bTime = typeof b.stat.ctime === "number" ? b.stat.ctime : b.stat.mtime;
-			return bTime - aTime;
-		})
+		.sort((a, b) => b.stat.ctime - a.stat.ctime)
 		.slice(0, maxNotes);
 
 	const cards: GalleryNoteCard[] = [];
@@ -80,7 +74,7 @@ export async function loadNotesFromFolder(
 		const content = await vault.cachedRead(file);
 		const { title, snippet } = extractTitleAndSnippet(file, content, currentLang);
 		const tags = extractTags(app, file);
-		const created = typeof file.stat.ctime === "number" ? file.stat.ctime : file.stat.mtime;
+		const created = file.stat.ctime;
 		cards.push({ file, title, snippet, tags, created, source: "markdown" });
 	}
 
@@ -129,7 +123,10 @@ async function loadNotesFromCardIndex(
 						.map((tag) => tag.replace(/^#/, "").trim())
 						.filter(Boolean)
 				: [];
-			const created = getCardTimestamp(rawCard, maybeFile);
+			const created = typeof rawCard.created === "string"
+				? Date.parse(rawCard.created)
+				: NaN;
+			if (!Number.isFinite(created)) return null;
 			const previewImagePath =
 				typeof rawCard.preview_image === "string"
 					? rawCard.preview_image
@@ -153,16 +150,6 @@ async function loadNotesFromCardIndex(
 	} catch {
 		return null;
 	}
-}
-
-function getCardTimestamp(card: CardIndexEntry, file: TFile): number {
-	for (const key of ["created", "updated", "modified"] as const) {
-		const raw = card[key];
-		if (typeof raw !== "string") continue;
-		const parsed = Date.parse(raw);
-		if (Number.isFinite(parsed)) return parsed;
-	}
-	return typeof file.stat.ctime === "number" ? file.stat.ctime : file.stat.mtime;
 }
 
 function collectMarkdownFiles(folder: TFolder, result: TFile[]): void {

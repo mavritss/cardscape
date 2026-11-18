@@ -36,7 +36,7 @@ The view also supports:
 - Auto-detection of first embedded image for note preview
 - Tag extraction from body tags and frontmatter tags
 - Filter notes by selected tags
-- Sort notes by creation time (newest first / oldest first)
+- Sort notes by creation time (newest first / oldest first). The card index stores the creation date in `created` and the last file modification date in `updated`; only `created` affects feed order. Existing creation dates are preserved when updating or rebuilding the index. New entries use the file creation time from Obsidian (`ctime`). Without a usable index, notes are loaded directly and sorted by `ctime`.
 - Configurable source folder
 - Configurable max notes limit for performance
 - RU/EN interface language support (with auto mode)

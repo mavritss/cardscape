@@ -14,7 +14,6 @@ type CardIndexEntry = {
 	has_visuals: boolean;
 	created: string;
 	updated: string;
-	modified: string;
 	source_mtime?: number;
 	source_size?: number;
 	indexed_at?: string;
@@ -35,7 +34,7 @@ const FLUSH_DELAY_MS = 500;
 export class CardIndexSynchronizer {
 	private readonly cardsByPath = new Map<string, CardIndexEntry>();
 	private readonly pendingUpserts = new Map<string, number>();
-	private indexLoaded = false;
+	private indexLoadPromise: Promise<void> | null = null;
 	private flushTimer: number | null = null;
 
 	constructor(
@@ -70,8 +69,7 @@ export class CardIndexSynchronizer {
 
 		this.plugin.registerEvent(
 			this.plugin.app.vault.on("rename", (file, oldPath) => {
-				void this.removePath(oldPath);
-				if (file instanceof TFile) this.queueUpsert(file);
+				if (file instanceof TFile) void this.renameFile(file, oldPath);
 			}),
 		);
 
@@ -81,15 +79,20 @@ export class CardIndexSynchronizer {
 	async rebuildAll(): Promise<void> {
 		await this.loadIndex();
 		this.clearPendingUpserts();
-		this.cardsByPath.clear();
+		const rebuiltCards = new Map<string, CardIndexEntry>();
 
 		let indexedCount = 0;
 		for (const file of this.plugin.app.vault.getMarkdownFiles()) {
 			if (!this.isIndexableMarkdownPath(file.path)) continue;
 			const card = await this.buildCard(file);
 			if (!card) continue;
-			this.cardsByPath.set(card.path, card);
+			rebuiltCards.set(card.path, card);
 			indexedCount += 1;
+		}
+
+		this.cardsByPath.clear();
+		for (const [path, card] of rebuiltCards) {
+			this.cardsByPath.set(path, card);
 		}
 
 		await this.writeIndex();
@@ -139,9 +142,28 @@ export class CardIndexSynchronizer {
 		this.scheduleFlush();
 	}
 
+	private async renameFile(file: TFile, oldPath: string): Promise<void> {
+		const path = normalizePath(file.path);
+		const previousPath = normalizePath(oldPath);
+		await this.loadIndex();
+		this.cancelPendingUpsert(previousPath);
+		const previousCard = this.cardsByPath.get(previousPath);
+		this.cardsByPath.delete(previousPath);
+		if (previousCard && this.isIndexableMarkdownPath(path)) {
+			this.cardsByPath.set(path, { ...previousCard, path });
+		}
+		this.scheduleFlush();
+		this.queueUpsert(file);
+	}
+
 	private async loadIndex(): Promise<void> {
-		if (this.indexLoaded) return;
-		this.indexLoaded = true;
+		if (!this.indexLoadPromise) {
+			this.indexLoadPromise = this.readIndex();
+		}
+		await this.indexLoadPromise;
+	}
+
+	private async readIndex(): Promise<void> {
 		this.cardsByPath.clear();
 
 		try {
@@ -164,6 +186,9 @@ export class CardIndexSynchronizer {
 		if (!rawCard || typeof rawCard !== "object") return null;
 		const card = rawCard as Partial<CardIndexEntry>;
 		if (typeof card.path !== "string" || !card.path.trim()) return null;
+		if (typeof card.created !== "string" || !Number.isFinite(Date.parse(card.created))) {
+			return null;
+		}
 
 		const path = normalizePath(card.path);
 		if (!this.isIndexableMarkdownPath(path)) return null;
@@ -175,7 +200,6 @@ export class CardIndexSynchronizer {
 					.filter((tag): tag is string => Boolean(tag))
 			: [];
 		const now = new Date().toISOString();
-		const modified = typeof card.modified === "string" ? card.modified : now;
 
 		return {
 			path,
@@ -187,9 +211,8 @@ export class CardIndexSynchronizer {
 			preview_image:
 				typeof card.preview_image === "string" ? card.preview_image : null,
 			has_visuals: Boolean(card.has_visuals),
-			created: typeof card.created === "string" ? card.created : modified,
-			updated: typeof card.updated === "string" ? card.updated : modified,
-			modified,
+			created: card.created,
+			updated: typeof card.updated === "string" ? card.updated : now,
 			source_mtime:
 				typeof card.source_mtime === "number" ? card.source_mtime : undefined,
 			source_size:
@@ -207,7 +230,7 @@ export class CardIndexSynchronizer {
 		const frontmatter = (cache?.frontmatter ?? {}) as FrontmatterLike;
 		const folderId = inferFolderId(file.path, frontmatter);
 		const type = inferType(folderId, content, frontmatter);
-		const modified = new Date(file.stat.mtime).toISOString();
+		const updated = new Date(file.stat.mtime).toISOString();
 		const tags = withRootTags(readFrontmatterTags(frontmatter));
 
 		return {
@@ -219,9 +242,9 @@ export class CardIndexSynchronizer {
 			folder_id: folderId,
 			preview_image: firstEmbed(content),
 			has_visuals: /!\[\[|!\[/.test(content),
-			created: modified,
-			updated: modified,
-			modified,
+			created: this.cardsByPath.get(normalizePath(file.path))?.created
+				?? new Date(file.stat.ctime).toISOString(),
+			updated,
 			source_mtime: file.stat.mtime,
 			source_size: file.stat.size,
 			indexed_at: new Date().toISOString(),
@@ -451,8 +474,8 @@ function isServicePath(path: string): boolean {
 }
 
 function compareCards(a: CardIndexEntry, b: CardIndexEntry): number {
-	const bTime = Date.parse(b.modified);
-	const aTime = Date.parse(a.modified);
+	const bTime = Date.parse(b.created);
+	const aTime = Date.parse(a.created);
 	if (Number.isFinite(aTime) && Number.isFinite(bTime) && bTime !== aTime) {
 		return bTime - aTime;
 	}
